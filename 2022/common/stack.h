@@ -16,6 +16,20 @@ void stack_push(Stack* s, int x)
     s->item_count++;
 }
 
+void stack_push_many(Stack* s, int* x, int count)
+{
+    for(int i = s->item_count -1; i >= 0; --i)
+    {
+        s->items[i+count] = s->items[i];
+    }
+
+    for(int i = 0; i < count; ++i)
+    {
+        s->items[i] = x[i];
+    }
+    s->item_count += count;
+}
+
 void stack_reverse(Stack* s)
 {
     Stack t = {0};
@@ -31,7 +45,7 @@ void stack_reverse(Stack* s)
 int stack_pop(Stack* s)
 {
     if(s->item_count == 0)
-        return;
+        return 0;
 
     int item = s->items[0];
     for(int i = 0; i < s->item_count; ++i)
@@ -41,6 +55,28 @@ int stack_pop(Stack* s)
     s->item_count--;
 
     return item;
+}
+
+void stack_pop_many(Stack* s, int* x, int count)
+{
+    if(s->item_count == 0)
+        return;
+
+    int item = s->items[0];
+
+    for(int i = 0; i < count; ++i)
+    {
+        x[i] = s->items[i];
+    }
+
+    for(int i = 0; i < s->item_count; ++i)
+    {
+        s->items[i] = s->items[i+count];
+    }
+
+    s->item_count -= count;
+
+    return;
 }
 
 int stack_peek(Stack* s, int index)

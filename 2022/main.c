@@ -5,6 +5,8 @@
 
 #include "common/util.h"
 #include "common/stack.h"
+#include "common/queue.h"
+#include "common/directory.h"
 
 void day1()
 {
@@ -343,6 +345,8 @@ void day4()
 
 }
 
+#define NUM_STACKS 9
+
 void day5()
 {
     util_print_day(5);
@@ -358,8 +362,9 @@ void day5()
 
     int col_index = 0;
 
-    Stack stacks[9] = {0};
+    Stack stacks[NUM_STACKS] = {0};
 
+    // parse out stacks
     for(;;)
     {
         int c = fgetc(fp);
@@ -393,7 +398,8 @@ void day5()
         col_index++;
     }
 
-    for(int i = 0; i < 9; ++i)
+    // reverse stacks to proper order
+    for(int i = 0; i < NUM_STACKS; ++i)
     {
         Stack* s = &stacks[i];
 
@@ -401,8 +407,15 @@ void day5()
         //stack_print(s);
     }
 
+    // copy stacks before operations to use in part two
+    Stack stacks2[NUM_STACKS] = {0};
+    memcpy(stacks2,stacks,sizeof(Stack)*NUM_STACKS);
+
+    int instructions_begin = ftell(fp);
+
     int stack_src,stack_dst,count;
 
+    // part 1
     for(;;)
     {
         int num_matches = fscanf(fp,"move %d from %d to %d\n", &count, &stack_src, &stack_dst);
@@ -422,12 +435,225 @@ void day5()
 
     printf("1) Stack message: ");
 
-    for(int i = 0; i < 9; ++i)
+    for(int i = 0; i < NUM_STACKS; ++i)
     {
         int c = stack_peek(&stacks[i],0);
         printf("%c", c);
     }
     printf("\n");
+
+    // return to instructions again
+    fseek(fp,instructions_begin, SEEK_SET);
+
+    // part 2
+    int items[32] = {0};
+    for(;;)
+    {
+        int num_matches = fscanf(fp,"move %d from %d to %d\n", &count, &stack_src, &stack_dst);
+
+        if(num_matches != 3)
+            break;
+
+        Stack* src = &stacks2[stack_src-1];
+        Stack* dst = &stacks2[stack_dst-1];
+
+        stack_pop_many(src,items,count);
+        stack_push_many(dst,items,count);
+    }
+
+    printf("2) Stack message: ");
+
+    for(int i = 0; i < NUM_STACKS; ++i)
+    {
+        int c = stack_peek(&stacks2[i],0);
+        printf("%c", c);
+    }
+    printf("\n");
+
+}
+
+bool day6_is_stream_unique(Queue* s, int count)
+{
+    if(s->item_count < count)
+        return false;
+
+    // check 4 characters are different
+    for(int i = 0; i < count; ++i)
+    {
+        char ci = s->items[i];
+        for(int j = 0; j < count; ++j)
+        {
+            if(i == j)
+                continue;
+
+            char cj = s->items[j];
+
+            if(ci == cj)
+            {
+                return false;
+            }
+        }
+    }
+    
+    return true;
+
+}
+
+void day6()
+{
+    util_print_day(6);
+
+    char* input_file = "inputs/6.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    int stream_index = 0;
+
+    Queue recent = {0};
+
+    // part 1
+    for(;;)
+    {
+        int c = fgetc(fp);
+
+        if(c == EOF)
+            break;
+
+        if(recent.item_count == 4)
+            dequeue(&recent); // shift out first
+
+        enqueue(&recent,c);
+        //queue_print(&recent); // for testing
+
+        bool unique = day6_is_stream_unique(&recent, 4);
+
+        if(unique)
+        {
+            printf("1) Stream Index: %d\n",stream_index+1);
+            break;
+        }
+
+        stream_index++;
+    }
+
+    fseek(fp,0,SEEK_SET);
+    stream_index = 0;
+
+    queue_reset(&recent);
+
+    // part 2
+    for(;;)
+    {
+        int c = fgetc(fp);
+
+        if(c == EOF)
+            break;
+
+        if(recent.item_count == 14)
+            dequeue(&recent); // shift out first
+
+        enqueue(&recent,c);
+        //queue_print(&recent); // for testing
+
+        bool unique = day6_is_stream_unique(&recent, 14);
+
+        if(unique)
+        {
+            printf("2) Stream Index: %d\n",stream_index+1);
+            break;
+        }
+
+        stream_index++;
+    }
+}
+
+
+void day7()
+{
+    util_print_day(7);
+
+    char* input_file = "inputs/7.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    FileNode root = {.name = "/", .dir = true};
+    FileNode* curr_node = &root;
+
+    // build directory hierarchy
+    for(;;)
+    {
+        char line[100+1] = {0};
+
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        // remove newline
+        int line_len = strlen(line);
+        line[line_len-1] = 0;
+
+        if(line[0] == '$')
+        {
+            // command
+            if(line[2] == 'c' && line[3] == 'd')
+            {
+                // cd
+                char name[32+1] = {0};
+                strcpy(name,&line[5]);
+
+                //printf("cd -> %s\n",name);
+
+                if(strcmp(name,"..") == 0)
+                {
+                    curr_node = curr_node->parent;
+                }
+                else
+                {
+                    curr_node = dir_goto(&root,name);
+                }
+                if(!curr_node)
+                {
+                    printf("Could not find node %s\n",name);
+                }
+            }
+        }
+        else
+        {
+            char name[32+1] = {0};
+
+            // parse directory or file
+            if(line[0] == 'd' && line[1] == 'i' && line[2] == 'r')
+            {
+                // dir
+                strcpy(name,&line[4]);
+                dir_add_node(curr_node,name,true);
+            }
+            else
+            {
+                int size = 0;
+
+                int matches = sscanf(line, "%d %s",&size,name);
+
+                // file
+                FileNode* f = dir_add_node(curr_node,name,false);
+                f->size = size;
+            }
+        }
+    }
+
+    // go through structure, and set total sizes on directory nodes
+    int sum = 0;
+    dir_get_total_sizes(&root,&sum);
+    dir_print(&root,0);
 }
 
 int main(int argc, char* args[])
@@ -438,6 +664,8 @@ int main(int argc, char* args[])
     day3();
     day4();
     day5();
+    day6();
+    day7();
     printf("\n======================================================\n");
     return 0;
 }
