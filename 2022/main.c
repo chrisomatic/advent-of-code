@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <limits.h>
 
 #include "common/util.h"
 #include "common/stack.h"
@@ -572,6 +573,39 @@ void day6()
     }
 }
 
+void day7_get_sum_directories(FileNode* r, int* sum)
+{
+    if(r->dir)
+    {
+        if(r->size <= 100000)
+        {
+            *sum += r->size;
+        }
+
+        for(int i = 0; i < r->node_count; ++i)
+        {
+            day7_get_sum_directories(r->nodes[i],sum);
+        }
+    }
+
+}
+
+void day7_get_min_directory_to_delete(FileNode* r,const int threshold, int* curr_min)
+{
+    if(r->dir)
+    {
+        if(r->size >= threshold)
+        {
+            if(r->size < *curr_min)
+                *curr_min = r->size;
+        }
+
+        for(int i = 0; i < r->node_count; ++i)
+        {
+            day7_get_min_directory_to_delete(r->nodes[i],threshold,curr_min);
+        }
+    }
+}
 
 void day7()
 {
@@ -612,17 +646,19 @@ void day7()
 
                 //printf("cd -> %s\n",name);
 
-                if(strcmp(name,"..") == 0)
-                {
+                FileNode* prev = curr_node;
+
+                if(strcmp(name,"/") == 0)
+                    curr_node = &root;
+                else if(strcmp(name,"..") == 0)
                     curr_node = curr_node->parent;
-                }
                 else
-                {
-                    curr_node = dir_goto(&root,name);
-                }
+                    curr_node = dir_goto_1level(curr_node,name);
+
                 if(!curr_node)
                 {
                     printf("Could not find node %s\n",name);
+                    curr_node = prev;
                 }
             }
         }
@@ -652,8 +688,323 @@ void day7()
 
     // go through structure, and set total sizes on directory nodes
     int sum = 0;
-    dir_get_total_sizes(&root,&sum);
-    dir_print(&root,0);
+    dir_calc_sizes(&root);
+
+    // print directory structure
+    //dir_print(&root,0);
+
+    int sum_p1 = 0;
+    day7_get_sum_directories(&root, &sum_p1);
+
+    printf("1) Sum: %d\n",sum_p1);
+
+    // part 2
+    const int total_space = 70000000;
+    const int needed_space = 30000000;
+
+    int used_space = root.size;
+    int unused_space = total_space - used_space;
+    int threshold_size = needed_space - unused_space;
+
+    int min = INT_MAX;
+    day7_get_min_directory_to_delete(&root,(const int)threshold_size, &min);
+
+    printf("2) Minimum size: %d\n",min);
+}
+
+#define GRID_SIZE 99
+
+void day8_print_grid(int grid[GRID_SIZE][GRID_SIZE])
+{
+    for(int i = 0; i < GRID_SIZE; ++i)
+    {
+        for(int j = 0; j < GRID_SIZE; ++j)
+        {
+            printf("%d",grid[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void day8()
+{
+    util_print_day(8);
+
+    char* input_file = "inputs/8.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    int grid[100][100] = {0};
+    int row = 0;
+    int col = 0;
+
+    for(;;)
+    {
+        int c = fgetc(fp);
+        if(c == EOF)
+            break;
+
+        if(c == '\n')
+        {
+            row++;
+            col = 0;
+            continue;
+        }
+
+        int x = ((char)c - '0');
+        grid[row][col] = x;
+        col++;
+    }
+
+    //day8_print_grid(grid);
+
+    int visible_tree_count = 4*(GRID_SIZE-1); // include all trees on the perimeter
+
+    // part 1
+    // traverse through inner 'trees'
+    for(int i = 1; i < GRID_SIZE -1; ++i)
+    {
+        for(int j = 1; j < GRID_SIZE -1; ++j)
+        {
+            int tree = grid[i][j];
+            
+            bool left = true;
+            bool right = true;
+            bool up = true;
+            bool down = true;
+
+            // check left
+            for(int l = i-1; l >= 0; --l)
+            {
+                int check = grid[l][j];
+                if(check >= tree)
+                {
+                    left = false;
+                    break;
+                }
+            }
+
+            // check right
+            for(int r = i+1; r <= GRID_SIZE-1; ++r)
+            {
+                int check = grid[r][j];
+                if(check >= tree)
+                {
+                    right = false;
+                    break;
+                }
+            }
+
+            // check up
+            for(int u = j-1; u >= 0; --u)
+            {
+                int check = grid[i][u];
+                if(check >= tree)
+                {
+                    up = false;
+                    break;
+                }
+            }
+
+            // check down
+            for(int d = j+1; d <= GRID_SIZE-1; ++d)
+            {
+                int check = grid[i][d];
+                if(check >= tree)
+                {
+                    down = false;
+                    break;
+                }
+            }
+
+            bool visible = left || right || up || down;
+
+            if(visible)
+            {
+                visible_tree_count++;
+            }
+        }
+    }
+
+    printf("1) Visible trees: %d\n",visible_tree_count);
+
+    int max_scenic_score = 0;
+
+    for(int i = 0; i < GRID_SIZE; ++i)
+    {
+        for(int j = 0; j < GRID_SIZE; ++j)
+        {
+            int tree = grid[i][j];
+
+            int left = 0;
+            int right = 0;
+            int up = 0;
+            int down = 0;
+
+            // check left
+            for(int l = i-1; l >= 0; --l)
+            {
+                left++;
+                int check = grid[l][j];
+                if(check >= tree)
+                    break;
+            }
+
+            // check right
+            for(int r = i+1; r <= GRID_SIZE-1; ++r)
+            {
+                right++;
+                int check = grid[r][j];
+                if(check >= tree)
+                    break;
+            }
+
+            // check up
+            for(int u = j-1; u >= 0; --u)
+            {
+                up++;
+                int check = grid[i][u];
+                if(check >= tree)
+                    break;
+            }
+
+            // check down
+            for(int d = j+1; d <= GRID_SIZE-1; ++d)
+            {
+                down++;
+                int check = grid[i][d];
+                if(check >= tree)
+                    break;
+            }
+
+            int scenic_score = up * down * left * right;
+
+            if(scenic_score > max_scenic_score)
+            {
+                max_scenic_score = scenic_score;
+            }
+        }
+    }
+
+    printf("2) Max Scenic Score: %d\n",max_scenic_score);
+}
+
+typedef struct
+{
+    int x;
+    int y;
+} Knot_t;
+
+bool day9_is_position_unique(Knot_t pos, Knot_t* visited_places, int num_visited_places)
+{
+    for(int i = 0; i < num_visited_places; ++i)
+    {
+        if(visited_places[i].x == pos.x && visited_places[i].y == pos.y)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void day9()
+{
+    util_print_day(9);
+
+    char* input_file = "inputs/9.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    Knot_t head = {0};
+    Knot_t tail = {0};
+
+    Knot_t visited_places[1024] = {0};
+    int num_visited_places = 0;
+
+    for(;;)
+    {
+        char dir;
+        int num;
+
+        int num_matches = fscanf(fp,"%c %d\n",&dir,&num);
+        if(num_matches != 2)
+            break;
+
+        // move head
+        switch(dir)
+        {
+            case 'L': head.x -= num; break;
+            case 'R': head.x += num; break;
+            case 'U': head.y -= num; break;
+            case 'D': head.y += num; break;
+
+            default:
+              printf("Not a valid direction %c\n",dir);
+        }
+
+        //printf("Head %d %d\n",head.x,head.y);
+
+        // move tail
+        int diff_x = head.x - tail.x;
+        int diff_y = head.y - tail.y;
+
+        if(diff_y == 0)
+        {
+            if(diff_x == -2)
+                tail.x -= 1;
+            else if(diff_x == 2)
+                tail.x += 1;
+        }
+        else if(diff_x == 0)
+        {
+            if(diff_y == -2)
+                tail.y -= 1;
+            else if(diff_y == 2)
+                tail.y += 1;
+        }
+        else
+        {
+            float dist = sqrt(diff_x*diff_x + diff_y*diff_y);
+
+            if(dist >= 2.0)
+            {
+                // not touching, move tail diagonally
+                if(diff_x < 0 && diff_y < 0)
+                {
+                    tail.x -= 1;
+                    tail.y -= 1;
+                }
+                else if(diff_x < 0 && diff_y > 0)
+                {
+                    tail.x -= 1;
+                    tail.y += 1;
+                }
+                else if(diff_x > 0 && diff_y < 0)
+                {
+                    tail.x += 1;
+                    tail.y -= 1;
+                }
+                else if(diff_x > 0 && diff_y > 0)
+                {
+                    tail.x += 1;
+                    tail.y += 1;
+                }
+            }
+        }
+
+
+
+    }
 }
 
 int main(int argc, char* args[])
@@ -666,6 +1017,8 @@ int main(int argc, char* args[])
     day5();
     day6();
     day7();
+    day8();
+    day9();
     printf("\n======================================================\n");
     return 0;
 }

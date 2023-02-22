@@ -44,6 +44,7 @@ FileNode* dir_add_node(FileNode* r, char* name, bool is_dir)
     //printf("Added node %s to %s\n",name,r->name);
 }
 
+
 FileNode* dir_goto(FileNode* r, char* name)
 {
     if(strcmp(r->name,name) == 0)
@@ -72,20 +73,52 @@ FileNode* dir_goto(FileNode* r, char* name)
     return n;
 }
 
-void dir_get_total_sizes(FileNode* r,int* sum)
+FileNode* dir_goto_1level(FileNode* r, char* name)
+{
+    for(int i = 0; i < r->node_count; ++i)
+    {
+        if(strcmp(r->nodes[i]->name,name) == 0)
+        {
+            return r->nodes[i];
+        }
+    }
+
+    return NULL;
+}
+
+void dir_calc_sizes(FileNode* r)
 {
     if(!r->dir)
     {
-        *sum += r->size;
+        // file
+        if(r->parent)
+            r->parent->size += r->size;
+            
         return;
     }
 
     for(int i = 0; i < r->node_count; ++i)
     {
-        dir_get_total_sizes(r->nodes[i],sum);
+        dir_calc_sizes(r->nodes[i]);
     }
 
-    r->size = *sum;
+    if(r->parent)
+        r->parent->size += r->size;
+}
+
+void dir_free(FileNode* r)
+{
+    // traverse through children first
+    for(int i = 0; i < r->node_count; ++i)
+    {
+        dir_free(r->nodes[i]);
+    }
+
+    if(r != NULL)
+    {
+        free(r);
+        r = NULL;
+    }
 }
 
 void dir_print(FileNode* r, int level)
