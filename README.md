@@ -5,17 +5,17 @@ https://adventofcode.com/
 ## 2022
 
 | Day        | Part 1        | Part 2  |
-| -----------|:-------------:| -------:|
-| 1 | :star: | :star: |
-| 2 | :star: | :star: |
-| 3 | :star: | :star: |
-| 4 | :star: | :star: |
-| 5 | :star: | :star: |
-| 6 | :star: | :star: |
-| 7 | :star: | :star: |
-| 8 | :star: | :star: |
-| 9 | :star: | :star: |
-| 10 | :star: | :star: |
+| -----------|:-------------:|:-------:|
+| 1 - Calorie Counting | :star: | :star: |
+| 2 - Rock, Paper Scissors | :star: | :star: |
+| 3 - Rucksack Reorganization | :star: | :star: |
+| 4 - Camp Cleanup | :star: | :star: |
+| 5 - Supply Stacks | :star: | :star: |
+| 6 - Tuning Trouble | :star: | :star: |
+| 7 - No Space Left On Device | :star: | :star: |
+| 8 - Treetop Tree House | :star: | :star: |
+| 9 - Rope Bridge | :star: | :star: |
+| 10 - Cathode-Ray Tube | :star: | :star: |
 | 11 | | |
 | 12 | | |
 | 13 | | |
