@@ -35,6 +35,16 @@ void queue_reset(Queue* q)
     q->item_count = 0;
 }
 
+bool queue_empty(Queue* q)
+{
+    return (q->item_count == 0);
+}
+
+bool queue_full(Queue* q)
+{
+    return (q->item_count >= 100);
+}
+
 int queue_peek(Queue* q, int index)
 {
     if(q->item_count <= index)

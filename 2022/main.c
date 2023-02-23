@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <limits.h>
+#include <math.h>
 
 #include "common/util.h"
 #include "common/stack.h"
@@ -900,16 +901,58 @@ typedef struct
     int y;
 } Knot_t;
 
-bool day9_is_position_unique(Knot_t pos, Knot_t* visited_places, int num_visited_places)
+void day9_update_tail(Knot_t* tail,Knot_t* head)
 {
-    for(int i = 0; i < num_visited_places; ++i)
+    // move tail
+
+    int diff_x = head->x - tail->x;
+    int diff_y = head->y - tail->y;
+
+    if(diff_y == 0) // aligned horizontally
     {
-        if(visited_places[i].x == pos.x && visited_places[i].y == pos.y)
+        if(diff_x == -2)
+            tail->x--;
+        else if(diff_x == 2)
+            tail->x++;
+    }
+    else if(diff_x == 0) // aligned vertically
+    {
+        if(diff_y == -2)
+            tail->y--;
+        else if(diff_y == 2)
+            tail->y++;
+    }
+    else
+    {
+        // not in same row or column
+        
+        float dist = sqrt(diff_x*diff_x + diff_y*diff_y);
+
+        if(dist >= 2.0)
         {
-            return false;
+            // not touching, move tail diagonally
+            if(diff_x < 0 && diff_y < 0)
+            {
+                tail->x--;
+                tail->y--;
+            }
+            else if(diff_x < 0 && diff_y > 0)
+            {
+                tail->x--;
+                tail->y++;
+            }
+            else if(diff_x > 0 && diff_y < 0)
+            {
+                tail->x++;
+                tail->y--;
+            }
+            else if(diff_x > 0 && diff_y > 0)
+            {
+                tail->x++;
+                tail->y++;
+            }
         }
     }
-    return true;
 }
 
 void day9()
@@ -925,11 +968,63 @@ void day9()
         return;
     }
 
+    Knot_t visited_places[10000] = {0};
+    int num_visited_places = 0;
+
     Knot_t head = {0};
     Knot_t tail = {0};
 
-    Knot_t visited_places[1024] = {0};
-    int num_visited_places = 0;
+    for(;;)
+    {
+
+        char dir;
+        int num;
+
+        int num_matches = fscanf(fp,"%c %d\n",&dir,&num);
+        if(num_matches != 2)
+            break;
+
+        for(int i = 0; i < num; ++i)
+        {
+            // move head
+            switch(dir)
+            {
+                case 'L': head.x--; break;
+                case 'R': head.x++; break;
+                case 'U': head.y--; break;
+                case 'D': head.y++; break;
+            }
+
+            day9_update_tail(&tail,&head);
+
+            bool is_pos_unique = true;
+            for(int j = 0; j < num_visited_places; ++j)
+            {
+                if(visited_places[j].x == tail.x && visited_places[j].y == tail.y)
+                {
+                    is_pos_unique = false;
+                }
+            }
+
+            if(is_pos_unique)
+            {
+                visited_places[num_visited_places].x = tail.x;
+                visited_places[num_visited_places].y = tail.y;
+                num_visited_places++;
+            }
+        }
+    }
+
+    printf("1) Unique positions: %d\n",num_visited_places);
+
+    // reset for part 2
+    fseek(fp,0,SEEK_SET);
+    num_visited_places = 0;
+
+    Knot_t knots[10] = {0};
+
+    Knot_t* head2 = &knots[0];
+    Knot_t* tail2 = &knots[9];
 
     for(;;)
     {
@@ -940,76 +1035,377 @@ void day9()
         if(num_matches != 2)
             break;
 
-        // move head
-        switch(dir)
+        for(int i = 0; i < num; ++i)
         {
-            case 'L': head.x -= num; break;
-            case 'R': head.x += num; break;
-            case 'U': head.y -= num; break;
-            case 'D': head.y += num; break;
+            // move head
+            switch(dir)
+            {
+                case 'L': head2->x--; break;
+                case 'R': head2->x++; break;
+                case 'U': head2->y--; break;
+                case 'D': head2->y++; break;
+            }
 
-            default:
-              printf("Not a valid direction %c\n",dir);
+            // update tailing knots
+            for(int j = 0; j < 9; ++j)
+            {
+                day9_update_tail(&knots[j+1],&knots[j]);
+            }
+
+            bool is_pos_unique = true;
+            for(int j = 0; j < num_visited_places; ++j)
+            {
+                if(visited_places[j].x == tail2->x && visited_places[j].y == tail2->y)
+                {
+                    is_pos_unique = false;
+                }
+            }
+
+            if(is_pos_unique)
+            {
+                visited_places[num_visited_places].x = tail2->x;
+                visited_places[num_visited_places].y = tail2->y;
+                num_visited_places++;
+            }
+        }
+    }
+
+    printf("2) Unique positions: %d\n",num_visited_places);
+}
+
+typedef enum
+{
+    INST_NONE,
+    INST_NOOP,
+    INST_ADDX,
+} Instruction;
+
+void day10_incr_cycle(int* cycle,char crt[40][6], int x)
+{
+    int c = *cycle;
+    int cx = c % 40;
+    int cy = c / 40;
+    (*cycle)++;
+
+    if(( x-1 == cx) || (x == cx) || (x+1 == cx))
+    {
+        crt[cx][cy] = '#';
+    }
+    else
+    {
+        crt[cx][cy] = '.';
+    }
+}
+
+void day10()
+{
+    util_print_day(10);
+
+    char* input_file = "inputs/10.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    int cycle = 0;
+    int x = 1;
+    int curr_signal_str = 0;
+
+    int signal_strengths[10] = {0};
+    int num_signal_strengths = 0;
+
+    char line[10+1] = {0};
+
+    for(;;)
+    {
+        if(fgets(line,10,fp) == NULL)
+            break;
+
+        if(line[0] == 'n' && line[1] == 'o' && line[2] == 'o' && line[3] == 'p')
+        {
+            // noop
+            // printf("noop\n");
+            cycle++;
+            curr_signal_str = x*cycle;
+            if(cycle == 20 || cycle == 60 || cycle == 100 || cycle == 140 || cycle == 180 || cycle == 220)
+            {
+                signal_strengths[num_signal_strengths++] = curr_signal_str;
+            }
+            continue;
         }
 
-        //printf("Head %d %d\n",head.x,head.y);
-
-        // move tail
-        int diff_x = head.x - tail.x;
-        int diff_y = head.y - tail.y;
-
-        if(diff_y == 0)
+        char instruction[5] = {0};
+        int operand;
+        int matches = sscanf(line,"%s %d",instruction, &operand);
+        if(matches != 2)
         {
-            if(diff_x == -2)
-                tail.x -= 1;
-            else if(diff_x == 2)
-                tail.x += 1;
+            printf("matches: %d\n",matches);
+            continue;
         }
-        else if(diff_x == 0)
+
+        if(strcmp(instruction,"addx") == 0)
         {
-            if(diff_y == -2)
-                tail.y -= 1;
-            else if(diff_y == 2)
-                tail.y += 1;
+            //printf("addx %d\n",operand);
+            cycle++;
+            curr_signal_str = x*cycle;
+            if(cycle == 20 || cycle == 60 || cycle == 100 || cycle == 140 || cycle == 180 || cycle == 220)
+            {
+                signal_strengths[num_signal_strengths++] = curr_signal_str;
+            }
+            cycle++;
+            curr_signal_str = x*cycle;
+            if(cycle == 20 || cycle == 60 || cycle == 100 || cycle == 140 || cycle == 180 || cycle == 220)
+            {
+                signal_strengths[num_signal_strengths++] = curr_signal_str;
+            }
+            x += operand;
+        }
+    }
+
+    int sum = 0;
+    for(int i = 0; i < num_signal_strengths; ++i)
+    {
+        sum += signal_strengths[i];
+    }
+    
+    printf("1) Sum: %d\n",sum);
+
+    // part 2
+
+    fseek(fp,0,SEEK_SET);
+    cycle = 0;
+    x = 1;
+
+    char crt[40][6] = {0};
+    int crt_x = 0,crt_y = 0;
+
+    for(;;)
+    {
+        if(fgets(line,10,fp) == NULL)
+            break;
+
+        if(line[0] == 'n' && line[1] == 'o' && line[2] == 'o' && line[3] == 'p')
+        {
+            // noop
+            // printf("noop\n");
+            day10_incr_cycle(&cycle,crt,x);
         }
         else
         {
-            float dist = sqrt(diff_x*diff_x + diff_y*diff_y);
-
-            if(dist >= 2.0)
+            char instruction[5] = {0};
+            int operand;
+            int matches = sscanf(line,"%s %d",instruction, &operand);
+            if(matches != 2)
             {
-                // not touching, move tail diagonally
-                if(diff_x < 0 && diff_y < 0)
-                {
-                    tail.x -= 1;
-                    tail.y -= 1;
-                }
-                else if(diff_x < 0 && diff_y > 0)
-                {
-                    tail.x -= 1;
-                    tail.y += 1;
-                }
-                else if(diff_x > 0 && diff_y < 0)
-                {
-                    tail.x += 1;
-                    tail.y -= 1;
-                }
-                else if(diff_x > 0 && diff_y > 0)
-                {
-                    tail.x += 1;
-                    tail.y += 1;
-                }
+                printf("matches: %d\n",matches);
+                continue;
+            }
+
+            if(strcmp(instruction,"addx") == 0)
+            {
+                //printf("addx %d\n",operand);
+                day10_incr_cycle(&cycle,crt,x);
+                day10_incr_cycle(&cycle,crt,x);
+                x += operand;
             }
         }
 
-
-
+        // determine pixel value
     }
+
+    printf("2)\n");
+
+    // print CRT screen
+    for(int j = 0; j < 6; ++j)
+    {
+        printf("   ");
+        for(int i = 0; i < 40; ++i)
+        {
+            printf("%c",crt[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+
+typedef struct
+{
+    Queue items;
+    char operation;
+    int operand;
+    int test_divisor;
+    int true_monkey;
+    int false_monkey;
+    int total_inspections;
+} Monkey_t;
+
+void day11_print_monkey(Monkey_t* m)
+{
+    printf("=========== Monkey ==============\n");
+    printf("Items (%d): ", m->items.item_count);
+    for(int i = 0; i < m->items.item_count; ++i)
+    {
+        printf("%d", m->items.items[i]);
+        if(i < m->items.item_count-1)
+            printf(", ");
+    }
+    printf("\n");
+    printf("Operation: %c %d\n", m->operation, m->operand);
+    printf("Test Divisor: %d\n",m->test_divisor);
+    printf("True Case: throw to monkey %d\n",m->true_monkey);
+    printf("False Case: throw to monkey %d\n",m->false_monkey);
+}
+
+void day11()
+{
+    util_print_day(11);
+
+    char* input_file = "inputs/11_test.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+
+    char line[100+1] = {0};
+
+    Monkey_t monkeys[10] = {0};
+    int num_monkeys;
+
+    // parse out monkeys
+
+    for(;;)
+    {
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        int num = -1;
+        int num_matches = sscanf(line,"Monkey %d:\n",&num);
+
+        if(num_matches == 1)
+        {
+            Monkey_t* monkey = &monkeys[num];
+
+            char* p;
+
+            // items
+            fgets(line,100,fp);
+            p = util_str_goto_char(line,100,':');
+
+            char** tokens = util_str_split(p, ',');
+            if(tokens)
+            {
+                for (int i = 0; *(tokens + i); ++i)
+                {
+                    int v = atoi(*(tokens+i));
+                    enqueue(&monkey->items,v);
+                    free(*(tokens + i));
+                }
+                printf("\n");
+                free(tokens);
+            }
+
+            // operation
+            fgets(line,100,fp);
+            p = util_str_goto_char(line,100,':');
+            sscanf(p+1,"new = old %c %d\n",&monkey->operation, &monkey->operand);
+
+            // test
+            fgets(line,100,fp);
+            p = util_str_goto_char(line,100,':');
+            sscanf(p+1,"divisible by %d\n",&monkey->test_divisor);
+
+            // true case
+            fgets(line,100,fp);
+            p = util_str_goto_char(line,100,':');
+            sscanf(p+1,"throw to monkey %d\n",&monkey->true_monkey);
+
+            // false case
+            fgets(line,100,fp);
+            p = util_str_goto_char(line,100,':');
+            sscanf(p+1,"throw to monkey %d\n",&monkey->false_monkey);
+
+            day11_print_monkey(monkey);
+
+            num_monkeys++;
+        }
+    }
+
+    // part 1
+
+    // Go bananas
+
+    for(int r = 0; r < 20; ++r)
+    {
+        // begin round
+        for(int i = 0; i < num_monkeys; ++i)
+        {
+            Monkey_t* m = &monkeys[i];
+
+            for(int j = 0; j < m->items.item_count; ++j)
+            {
+                int item = dequeue(&m->items);
+
+                switch(m->operation)
+                {
+                    case '+':
+                        if(m->operand == 0)
+                        {
+                            item = item + item;
+                            break;
+                        }
+                        item = item + m->operand;
+                        break;
+                    case '*':
+                        if(m->operand == 0)
+                        {
+                            item = item * item;
+                            break;
+                        }
+                        item = item * m->operand;
+                        break;
+                    default:
+                        break;
+                }
+
+                item /= 3;
+
+                m->total_inspections++;
+
+                if(item % m->test_divisor == 0)
+                {
+                    // true
+                    enqueue(&monkeys[m->true_monkey].items,item);
+                }
+                else
+                {
+                    // false
+                    enqueue(&monkeys[m->false_monkey].items,item);
+                }
+            }
+        }
+        // end round
+    }
+
+    printf("\n");
+
+    for(int i = 0; i < num_monkeys; ++i)
+    {
+        printf("Monkey %d inspected items %d times\n",i,monkeys[i].total_inspections);
+    }
+
 }
 
 int main(int argc, char* args[])
 {
     printf("\n===================== AOC 2022 =======================\n");
+
     day1();
     day2();
     day3();
@@ -1019,6 +1415,9 @@ int main(int argc, char* args[])
     day7();
     day8();
     day9();
+    day10();
+    day11();
+
     printf("\n======================================================\n");
     return 0;
 }
