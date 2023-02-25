@@ -2,6 +2,8 @@
 
 #include <assert.h>
 
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define ABS(x) (x < 0 ? -1*x : x);
 
 void util_print_day(int day)
@@ -22,6 +24,21 @@ void util_sort(int arr[], int n)
         j = i - 1;
  
         while (j >= 0 && arr[j] > key) {
+            arr[j + 1] = arr[j];
+            j = j - 1;
+        }
+        arr[j + 1] = key;
+    }
+}
+
+void util_sort_desc(int arr[], int n)
+{
+    int i, key, j;
+    for (i = 1; i < n; i++) {
+        key = arr[i];
+        j = i - 1;
+ 
+        while (j >= 0 && arr[j] < key) {
             arr[j + 1] = arr[j];
             j = j - 1;
         }
@@ -89,4 +106,25 @@ char** util_str_split(char* a_str, const char a_delim)
     }
 
     return result;
+}
+
+int util_get_prime_factors(int num, int* factors, int factors_len)
+{
+    int c = 2;
+    int fi = 0;
+    while (num > 1) {
+    if (num % c == 0) {
+        factors[fi++] = c;
+        if(fi >= factors_len)
+        {
+            printf("Too many factors to fit in array1\n");
+            break;
+        }
+        num /= c;
+    }
+    else
+        c++;
+    }
+
+    return fi;
 }

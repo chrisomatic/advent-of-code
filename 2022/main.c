@@ -4,8 +4,10 @@
 #include <string.h>
 #include <limits.h>
 #include <math.h>
+#include <sys/time.h>
 
 #include "common/util.h"
+#include "common/list.h"
 #include "common/stack.h"
 #include "common/queue.h"
 #include "common/directory.h"
@@ -474,7 +476,7 @@ void day5()
 
 }
 
-bool day6_is_stream_unique(Queue* s, int count)
+bool day6_is_stream_unique(IntQueue_t* s, int count)
 {
     if(s->item_count < count)
         return false;
@@ -516,7 +518,7 @@ void day6()
 
     int stream_index = 0;
 
-    Queue recent = {0};
+    IntQueue_t recent = {0};
 
     // part 1
     for(;;)
@@ -527,10 +529,10 @@ void day6()
             break;
 
         if(recent.item_count == 4)
-            dequeue(&recent); // shift out first
+            dequeue_int(&recent); // shift out first
 
-        enqueue(&recent,c);
-        //queue_print(&recent); // for testing
+        enqueue_int(&recent,c);
+        //queue_int_print(&recent); // for testing
 
         bool unique = day6_is_stream_unique(&recent, 4);
 
@@ -546,7 +548,7 @@ void day6()
     fseek(fp,0,SEEK_SET);
     stream_index = 0;
 
-    queue_reset(&recent);
+    queue_int_reset(&recent);
 
     // part 2
     for(;;)
@@ -557,10 +559,10 @@ void day6()
             break;
 
         if(recent.item_count == 14)
-            dequeue(&recent); // shift out first
+            dequeue_int(&recent); // shift out first
 
-        enqueue(&recent,c);
-        //queue_print(&recent); // for testing
+        enqueue_int(&recent,c);
+        //queue_int_print(&recent); // for testing
 
         bool unique = day6_is_stream_unique(&recent, 14);
 
@@ -1230,10 +1232,9 @@ void day10()
     }
 }
 
-
 typedef struct
 {
-    Queue items;
+    IntQueue_t items;
     char operation;
     int operand;
     int test_divisor;
@@ -1241,6 +1242,61 @@ typedef struct
     int false_monkey;
     int total_inspections;
 } Monkey_t;
+
+typedef struct
+{
+    List_t factors;
+} MonkeyItem;
+
+typedef struct
+{
+    MonkeyItem items[40];
+    int item_count;
+} MonkeyItemQueue;
+
+typedef struct
+{
+    MonkeyItemQueue items;
+    char operation;
+    int operand;
+    int test_divisor;
+    int true_monkey;
+    int false_monkey;
+    int total_inspections;
+} Monkey2_t;
+
+void monkey_item_enqueue(MonkeyItemQueue* q, MonkeyItem* item)
+{
+    memcpy(&q->items[q->item_count++],item,sizeof(MonkeyItem));
+}
+
+MonkeyItem* monkey_item_dequeue(MonkeyItemQueue* q)
+{
+    if(q->item_count == 0)
+        return NULL;
+
+    MonkeyItem* item = &q->items[0];
+    for(int i = 0; i < q->item_count; ++i)
+    {
+        memcpy(&q->items[i],&q->items[i+1],sizeof(MonkeyItem));
+    }
+    q->item_count--;
+
+    return item;
+}
+
+void monkey_factorize(MonkeyItem* mi, int item)
+{
+    int factors[10] = {0};
+    int num_factors = util_get_prime_factors(item, factors, 10);
+
+    memset(mi,0,sizeof(MonkeyItem));
+    for(int k = 0; k < num_factors; ++k)
+    {
+        if(list_is_unique(&mi->factors, factors[k]))
+            list_add(&mi->factors,factors[k]);
+    }
+}
 
 void day11_print_monkey(Monkey_t* m)
 {
@@ -1272,10 +1328,9 @@ void day11()
         return;
     }
 
-
     char line[100+1] = {0};
 
-    Monkey_t monkeys[10] = {0};
+    Monkey_t monkeys[8] = {0};
     int num_monkeys;
 
     // parse out monkeys
@@ -1304,10 +1359,9 @@ void day11()
                 for (int i = 0; *(tokens + i); ++i)
                 {
                     int v = atoi(*(tokens+i));
-                    enqueue(&monkey->items,v);
+                    enqueue_int(&monkey->items,v);
                     free(*(tokens + i));
                 }
-                printf("\n");
                 free(tokens);
             }
 
@@ -1331,16 +1385,36 @@ void day11()
             p = util_str_goto_char(line,100,':');
             sscanf(p+1,"throw to monkey %d\n",&monkey->false_monkey);
 
-            day11_print_monkey(monkey);
+            //day11_print_monkey(monkey);
 
             num_monkeys++;
         }
+    }
+    
+    // copy initial monkey state later for part 2
+    Monkey2_t monkeys2[8] = {0};
+
+    for(int i = 0; i < num_monkeys; ++i)
+    {
+        for(int j = 0; j < monkeys[i].items.item_count; ++j)
+        {
+            int item = monkeys[i].items.items[j];
+            MonkeyItem mi = {0};
+            monkey_factorize(&mi,item);
+            monkey_item_enqueue(&monkeys2[i].items,&mi);
+        }
+
+        monkeys2[i].operation = monkeys[i].operation;
+        monkeys2[i].operand = monkeys[i].operand;
+        monkeys2[i].test_divisor = monkeys[i].test_divisor;
+        monkeys2[i].true_monkey = monkeys[i].true_monkey;
+        monkeys2[i].false_monkey = monkeys[i].false_monkey;
+        monkeys2[i].total_inspections = monkeys[i].total_inspections;
     }
 
     // part 1
 
     // Go bananas
-
     for(int r = 0; r < 20; ++r)
     {
         // begin round
@@ -1348,18 +1422,15 @@ void day11()
         {
             Monkey_t* m = &monkeys[i];
 
-            for(int j = 0; j < m->items.item_count; ++j)
+            int initial_item_count = m->items.item_count;
+
+            for(int j = 0; j < initial_item_count; ++j)
             {
-                int item = dequeue(&m->items);
+                int item = dequeue_int(&m->items);
 
                 switch(m->operation)
                 {
                     case '+':
-                        if(m->operand == 0)
-                        {
-                            item = item + item;
-                            break;
-                        }
                         item = item + m->operand;
                         break;
                     case '*':
@@ -1378,28 +1449,131 @@ void day11()
 
                 m->total_inspections++;
 
-                if(item % m->test_divisor == 0)
+                int remainder = item % m->test_divisor;
+
+                if(remainder == 0)
                 {
                     // true
-                    enqueue(&monkeys[m->true_monkey].items,item);
+                    enqueue_int(&monkeys[m->true_monkey].items,item);
                 }
                 else
                 {
                     // false
-                    enqueue(&monkeys[m->false_monkey].items,item);
+                    enqueue_int(&monkeys[m->false_monkey].items,item);
                 }
             }
         }
         // end round
     }
 
-    printf("\n");
+    int inspection_list[8] = {0};
 
     for(int i = 0; i < num_monkeys; ++i)
     {
-        printf("Monkey %d inspected items %d times\n",i,monkeys[i].total_inspections);
+        inspection_list[i] = monkeys[i].total_inspections;
     }
 
+    // sort to get top 2 total inspections
+    util_sort_desc(inspection_list, num_monkeys);
+
+    int monkey_business = inspection_list[0] * inspection_list[1];
+
+    printf("1) Monkey Business: %d\n", monkey_business);
+
+
+#if 1
+
+    // part 2
+
+    for(int r = 0; r < 10000; ++r)
+    {
+        // begin round
+        for(int i = 0; i < num_monkeys; ++i)
+        {
+            Monkey2_t* m = &monkeys2[i];
+
+            int initial_item_count = m->items.item_count;
+
+            for(int j = 0; j < initial_item_count; ++j)
+            {
+                MonkeyItem* item = monkey_item_dequeue(&m->items);
+
+                switch(m->operation)
+                {
+                    case '+':
+                    {
+                        int product = 1;
+                        for(int k = 0; k < item->factors.item_count; ++k)
+                        {
+                            product *= item->factors.items[k];
+                        }
+                        product += m->operand;
+                        monkey_factorize(item,product);
+
+                    } break;
+                    case '*':
+                        if(m->operand == 0)
+                        {
+                            //item = item * item;
+                            break;
+                        }
+
+                        if(list_is_unique(&item->factors,m->operand))
+                        {
+                            list_add(&item->factors,m->operand);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+                m->total_inspections++;
+
+                bool divisible = !list_is_unique(&item->factors, m->test_divisor);
+
+                if(divisible)
+                {
+                    // true
+                    monkey_item_enqueue(&monkeys2[m->true_monkey].items,item);
+                }
+                else
+                {
+                    // false
+                    monkey_item_enqueue(&monkeys2[m->false_monkey].items,item);
+                }
+            }
+        }
+        // end round
+    }
+
+    for(int i = 0; i < num_monkeys; ++i)
+    {
+        inspection_list[i] = monkeys2[i].total_inspections;
+        printf("%d: %d\n",i,monkeys2[i].total_inspections);
+    }
+
+    // sort to get top 2 total inspections
+    util_sort_desc(inspection_list, num_monkeys);
+
+    int64_t monkey_business2 = (int64_t)(inspection_list[0]) * inspection_list[1];
+
+    printf("2) Monkey Business: %ld\n", monkey_business2);
+
+#endif
+}
+
+void day12()
+{
+    util_print_day(12);
+
+    char* input_file = "inputs/12.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
 }
 
 int main(int argc, char* args[])
@@ -1417,6 +1591,7 @@ int main(int argc, char* args[])
     day9();
     day10();
     day11();
+    day12();
 
     printf("\n======================================================\n");
     return 0;

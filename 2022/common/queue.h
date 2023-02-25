@@ -1,21 +1,77 @@
 #pragma once
 
+#define QUEUE_MAX 100
+
 typedef struct
 {
-    int items[100];
+    void* items[QUEUE_MAX];
     int item_count;
-} Queue;
+} Queue_t;
 
-bool enqueue(Queue* q, int x)
+bool enqueue(Queue_t* q, void* x)
 {
-    if(q->item_count >= 100)
+    if(q->item_count >= QUEUE_MAX)
         return false;
 
     q->items[q->item_count++] = x;
     return true;
 }
 
-int dequeue(Queue* q)
+void* dequeue(Queue_t* q)
+{
+    if(q->item_count == 0)
+        return 0;
+
+    void* item = q->items[0];
+    for(int i = 0; i < q->item_count; ++i)
+    {
+        q->items[i] = q->items[i+1];
+    }
+    q->item_count--;
+
+    return item;
+}
+
+void queue_reset(Queue_t* q)
+{
+    q->item_count = 0;
+}
+
+bool queue_empty(Queue_t* q)
+{
+    return (q->item_count == 0);
+}
+
+bool queue_full(Queue_t* q)
+{
+    return (q->item_count >= QUEUE_MAX);
+}
+
+void* queue_peek(Queue_t* q, int index)
+{
+    if(q->item_count <= index)
+        return 0;
+
+    return q->items[index];
+}
+
+
+typedef struct
+{
+    int items[QUEUE_MAX];
+    int item_count;
+} IntQueue_t;
+
+bool enqueue_int(IntQueue_t* q, int x)
+{
+    if(q->item_count >= QUEUE_MAX)
+        return false;
+
+    q->items[q->item_count++] = x;
+    return true;
+}
+
+int dequeue_int(IntQueue_t* q)
 {
     if(q->item_count == 0)
         return 0;
@@ -30,22 +86,22 @@ int dequeue(Queue* q)
     return item;
 }
 
-void queue_reset(Queue* q)
+void queue_int_reset(IntQueue_t* q)
 {
     q->item_count = 0;
 }
 
-bool queue_empty(Queue* q)
+bool queue_int_empty(IntQueue_t* q)
 {
     return (q->item_count == 0);
 }
 
-bool queue_full(Queue* q)
+bool queue_int_full(IntQueue_t* q)
 {
-    return (q->item_count >= 100);
+    return (q->item_count >= QUEUE_MAX);
 }
 
-int queue_peek(Queue* q, int index)
+int queue_int_peek(IntQueue_t* q, int index)
 {
     if(q->item_count <= index)
         return 0;
@@ -53,12 +109,12 @@ int queue_peek(Queue* q, int index)
     return q->items[index];
 }
 
-void queue_print(Queue* q)
+void queue_int_print(IntQueue_t* q)
 {
     printf("Queue %p (size: %d)\n",q,q->item_count);
     for(int j = 0; j < q->item_count; ++j)
     {
-        int c = queue_peek(q,j);
+        int c = queue_int_peek(q,j);
         printf(" %c",c);
     }
     printf("\n");
