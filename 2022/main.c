@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <limits.h>
+#include <stdint.h>
 #include <math.h>
 #include <sys/time.h>
 
@@ -1242,21 +1243,9 @@ typedef struct
     int false_monkey;
     int total_inspections;
 } Monkey_t;
-
 typedef struct
 {
-    List_t factors;
-} MonkeyItem;
-
-typedef struct
-{
-    MonkeyItem items[40];
-    int item_count;
-} MonkeyItemQueue;
-
-typedef struct
-{
-    MonkeyItemQueue items;
+    Int64Queue_t items;
     char operation;
     int operand;
     int test_divisor;
@@ -1264,39 +1253,6 @@ typedef struct
     int false_monkey;
     int total_inspections;
 } Monkey2_t;
-
-void monkey_item_enqueue(MonkeyItemQueue* q, MonkeyItem* item)
-{
-    memcpy(&q->items[q->item_count++],item,sizeof(MonkeyItem));
-}
-
-MonkeyItem* monkey_item_dequeue(MonkeyItemQueue* q)
-{
-    if(q->item_count == 0)
-        return NULL;
-
-    MonkeyItem* item = &q->items[0];
-    for(int i = 0; i < q->item_count; ++i)
-    {
-        memcpy(&q->items[i],&q->items[i+1],sizeof(MonkeyItem));
-    }
-    q->item_count--;
-
-    return item;
-}
-
-void monkey_factorize(MonkeyItem* mi, int item)
-{
-    int factors[10] = {0};
-    int num_factors = util_get_prime_factors(item, factors, 10);
-
-    memset(mi,0,sizeof(MonkeyItem));
-    for(int k = 0; k < num_factors; ++k)
-    {
-        if(list_is_unique(&mi->factors, factors[k]))
-            list_add(&mi->factors,factors[k]);
-    }
-}
 
 void day11_print_monkey(Monkey_t* m)
 {
@@ -1319,7 +1275,7 @@ void day11()
 {
     util_print_day(11);
 
-    char* input_file = "inputs/11_test.txt";
+    char* input_file = "inputs/11.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -1390,25 +1346,21 @@ void day11()
             num_monkeys++;
         }
     }
-    
-    // copy initial monkey state later for part 2
+
+    // copy monkey to monkeys2 for part 2 later
     Monkey2_t monkeys2[8] = {0};
 
     for(int i = 0; i < num_monkeys; ++i)
     {
         for(int j = 0; j < monkeys[i].items.item_count; ++j)
         {
-            int item = monkeys[i].items.items[j];
-            MonkeyItem mi = {0};
-            monkey_factorize(&mi,item);
-            monkey_item_enqueue(&monkeys2[i].items,&mi);
+            enqueue_int64(&monkeys2[i].items,(int64_t)monkeys[i].items.items[j]);
         }
-
-        monkeys2[i].operation = monkeys[i].operation;
-        monkeys2[i].operand = monkeys[i].operand;
-        monkeys2[i].test_divisor = monkeys[i].test_divisor;
-        monkeys2[i].true_monkey = monkeys[i].true_monkey;
-        monkeys2[i].false_monkey = monkeys[i].false_monkey;
+        monkeys2[i].operation         = monkeys[i].operation;
+        monkeys2[i].operand           = monkeys[i].operand;
+        monkeys2[i].test_divisor      = monkeys[i].test_divisor;
+        monkeys2[i].true_monkey       = monkeys[i].true_monkey;
+        monkeys2[i].false_monkey      = monkeys[i].false_monkey;
         monkeys2[i].total_inspections = monkeys[i].total_inspections;
     }
 
@@ -1479,12 +1431,17 @@ void day11()
     int monkey_business = inspection_list[0] * inspection_list[1];
 
     printf("1) Monkey Business: %d\n", monkey_business);
-
-
-#if 1
-
+    
     // part 2
 
+    int common_factor = 1;
+
+    for(int i = 0; i < num_monkeys; ++i)
+    {
+        common_factor *= monkeys[i].test_divisor;
+    }
+
+    // Go bananas
     for(int r = 0; r < 10000; ++r)
     {
         // begin round
@@ -1496,32 +1453,20 @@ void day11()
 
             for(int j = 0; j < initial_item_count; ++j)
             {
-                MonkeyItem* item = monkey_item_dequeue(&m->items);
+                int64_t item = dequeue_int64(&m->items);
 
                 switch(m->operation)
                 {
                     case '+':
-                    {
-                        int product = 1;
-                        for(int k = 0; k < item->factors.item_count; ++k)
-                        {
-                            product *= item->factors.items[k];
-                        }
-                        product += m->operand;
-                        monkey_factorize(item,product);
-
-                    } break;
+                        item = item + m->operand;
+                        break;
                     case '*':
                         if(m->operand == 0)
                         {
-                            //item = item * item;
+                            item = item * item;
                             break;
                         }
-
-                        if(list_is_unique(&item->factors,m->operand))
-                        {
-                            list_add(&item->factors,m->operand);
-                        }
+                        item = item * m->operand;
                         break;
                     default:
                         break;
@@ -1529,17 +1474,19 @@ void day11()
 
                 m->total_inspections++;
 
-                bool divisible = !list_is_unique(&item->factors, m->test_divisor);
+                item %= common_factor;
 
-                if(divisible)
+                int64_t remainder = item % m->test_divisor;
+
+                if(remainder == 0)
                 {
                     // true
-                    monkey_item_enqueue(&monkeys2[m->true_monkey].items,item);
+                    enqueue_int64(&monkeys2[m->true_monkey].items,item);
                 }
                 else
                 {
                     // false
-                    monkey_item_enqueue(&monkeys2[m->false_monkey].items,item);
+                    enqueue_int64(&monkeys2[m->false_monkey].items,item);
                 }
             }
         }
@@ -1549,18 +1496,20 @@ void day11()
     for(int i = 0; i < num_monkeys; ++i)
     {
         inspection_list[i] = monkeys2[i].total_inspections;
-        printf("%d: %d\n",i,monkeys2[i].total_inspections);
     }
 
     // sort to get top 2 total inspections
     util_sort_desc(inspection_list, num_monkeys);
 
-    int64_t monkey_business2 = (int64_t)(inspection_list[0]) * inspection_list[1];
+    int64_t monkey_business2 = (int64_t)inspection_list[0] * inspection_list[1];
 
-    printf("2) Monkey Business: %ld\n", monkey_business2);
-
-#endif
+    printf("2) Monkey Business: %lld\n", monkey_business2);
 }
+
+typedef struct
+{
+    int x,y;
+} Pos;
 
 void day12()
 {
@@ -1574,6 +1523,59 @@ void day12()
         printf("Failed to open input file: %s\n",input_file);
         return;
     }
+
+    int grid[256][256] = {0};
+
+    int grid_width = 0, grid_height = 0;
+    int row = 0, col = 0;
+
+    Pos start = {0},end = {0};
+
+    for(;;)
+    {
+        int c = fgetc(fp);
+
+        if(c == EOF)
+            break;
+
+        if(c == '\n')
+        {
+            grid_width = col;
+            row++;
+            col = 0;
+            continue;
+        }
+
+        grid[row][col] = c;
+        if(c == 'S')
+        {
+            start.x = col;
+            start.y = row;
+        }
+        else if(c == 'E')
+        {
+            end.x = col;
+            end.y = row;
+        }
+        col++;
+    }
+
+    grid_height = row;
+
+    printf("Grid (%d x %d)\n", grid_width, grid_height);
+    printf("S [%d,%d] -> E [%d,%d]\n",start.x,start.y,end.x,end.y);
+
+#if 1
+    for(int i = 0; i < grid_height; ++i)
+    {
+        for(int j = 0; j < grid_width; ++j)
+        {
+            printf("%c",grid[i][j]);
+        }
+        printf("\n");
+    }
+    
+#endif
 }
 
 int main(int argc, char* args[])
