@@ -1579,6 +1579,7 @@ void day12()
 
     path_map_set(grid,grid_width,grid_height);
     path_find(start.x, start.y, end.x, end.y);
+    path_map_free();
 }
 
 int main(int argc, char* args[])

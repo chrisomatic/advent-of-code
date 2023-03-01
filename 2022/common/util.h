@@ -4,7 +4,7 @@
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
-#define ABS(x) (x < 0 ? -1*x : x);
+#define ABS(x) ((x) < 0 ? -1*(x) : (x));
 
 void util_print_day(int day)
 {
@@ -127,4 +127,9 @@ int util_get_prime_factors(int num, int* factors, int factors_len)
     }
 
     return fi;
+}
+
+void util_wait_until_key_press()
+{
+    getchar();
 }

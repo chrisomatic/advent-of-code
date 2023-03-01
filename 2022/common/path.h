@@ -14,16 +14,16 @@ struct PathNode
     struct PathNode* parent;
 };
 
-#define PATH_MAX_QUEUE_NODES 1024*10
+#define PATH_MAX_QUEUE_NODES 1024*8 // 8K
 
 typedef struct PathNodeQueue PathNodeQueue;
 struct PathNodeQueue
 {
-    PathNode nodes[PATH_MAX_QUEUE_NODES];
+    PathNode* nodes[PATH_MAX_QUEUE_NODES];
     int node_count;
 };
 
-int* path_map;
+PathNode* path_map; // full grid data
 int path_map_width;
 int path_map_height;
 
@@ -32,12 +32,12 @@ void path_print_queue(PathNodeQueue* q)
     printf("Queue (size: %d)\n",q->node_count);
     for(int i = 0; i < q->node_count; ++i)
     {
-        printf("%c [%p -> %p]",q->nodes[i].height,&q->nodes[i],q->nodes[i].parent);
+        printf("[%c (%d, %p)], ",q->nodes[i]->height,q->nodes[i]->g_score + q->nodes[i]->h_score, q->nodes[i]);
     }
     printf("\n");
 }
 
-bool path_node_enqueue(PathNodeQueue* q, PathNode* node)
+bool path_node_enqueue(PathNodeQueue* q, PathNode** node)
 {
     if(q->node_count >= PATH_MAX_QUEUE_NODES)
     {
@@ -45,9 +45,7 @@ bool path_node_enqueue(PathNodeQueue* q, PathNode* node)
         return false;
     }
 
-    memcpy(&q->nodes[q->node_count],node,sizeof(PathNode));
-    q->node_count++;
-    path_print_queue(q);
+    q->nodes[q->node_count++] = *node;
     return true;
 }
 
@@ -56,7 +54,7 @@ PathNode* path_node_dequeue(PathNodeQueue* q, bool use_priority)
     if(q->node_count == 0)
         return NULL;
 
-    PathNode* min = &q->nodes[0];
+    PathNode* min = q->nodes[0];
 
     int lowest_index = 0;
 
@@ -64,12 +62,12 @@ PathNode* path_node_dequeue(PathNodeQueue* q, bool use_priority)
     {
         for(int i = 1; i < q->node_count; ++i)
         {
-            int f_score = q->nodes[i].g_score + q->nodes[i].h_score;
+            int f_score = q->nodes[i]->g_score + q->nodes[i]->h_score;
             int f_score_min = min->g_score + min->h_score;
             
-            if(f_score < f_score_min || (f_score == f_score_min && q->nodes[i].h_score < min->h_score))
+            if(f_score < f_score_min || (f_score == f_score_min && q->nodes[i]->h_score < min->h_score))
             {
-                min = &q->nodes[i];
+                min = q->nodes[i];
                 lowest_index = i;
             }
         }
@@ -79,7 +77,7 @@ PathNode* path_node_dequeue(PathNodeQueue* q, bool use_priority)
     int remaining_nodes = q->node_count - lowest_index -1;
     if(remaining_nodes > 0)
     {
-        memcpy(min,min+1,remaining_nodes*sizeof(PathNode));
+        memmove(min,min+1,remaining_nodes*sizeof(PathNode));
     }
 
     q->node_count--;
@@ -91,7 +89,7 @@ bool path_node_queue_contains(PathNodeQueue* q,PathNode* n)
 {
     for(int i = 0; i < q->node_count; ++i)
     {
-        if(q->nodes[i].x == n->x && q->nodes[i].y == n->y)
+        if(q->nodes[i]->x == n->x && q->nodes[i]->y == n->y)
         {
             return true;
         }
@@ -103,13 +101,23 @@ int path_node_get_manhatten_distance(PathNode* a, PathNode* b)
 {
     int dx = ABS(a->x - b->x);
     int dy = ABS(a->y - b->y);
-    return 10*(dx+dy);
+    return (dx+dy);
 }
 
-int path_get_neighbors(PathNode* n, PathNode* neighbors, int direction_count)
+PathNode* path_get_node_from_map(int x, int y)
+{
+    if(!path_map)
+        return NULL;
+
+    return &path_map[y*path_map_width+x];
+}
+
+int path_get_neighbors(PathNode* n, PathNode* neighbors[], int direction_count)
 {
     int x = n->x;
     int y = n->y;
+
+    printf("current: %d, %d\n",x,y);
 
     PathPos up    = {.x = x, .y = y - 1};
     PathPos down  = {.x = x, .y = y + 1};
@@ -128,26 +136,17 @@ int path_get_neighbors(PathNode* n, PathNode* neighbors, int direction_count)
         {
             if(dir->y >= 0 && dir->y < path_map_height)
             {
-                // is neighbor walkable?
-                int c = path_map[(dir->y * path_map_width) + dir->x];
-
-                if(c <= n->height + 1)
-                {
-                    PathNode* b = &neighbors[neighbor_count++];
-
-                    b->x = dir->x;
-                    b->y = dir->y;
-                    b->height = c;
-                }
+                PathNode* c = &path_map[(dir->y * path_map_width) + dir->x];
+                neighbors[neighbor_count++] = c;
             }
         }
     }
+
     return neighbor_count;
 }
 
-
-PathNodeQueue path_open   = {0};
-PathNodeQueue path_closed = {0};
+PathNodeQueue path_open      = {0};
+PathNodeQueue path_closed    = {0};
 
 void path_reconstruct(PathNode* start, PathNode* end)
 {
@@ -156,8 +155,8 @@ void path_reconstruct(PathNode* start, PathNode* end)
 
     while(current && current != start)
     {
-        path_node_enqueue(&path, current);
-        printf("[%p]\n",current);
+        path_node_enqueue(&path, &current);
+        printf("[%p]->[%p]\n",current,current->parent);
         if(current->parent == current)
             break;
         
@@ -175,15 +174,37 @@ void path_reconstruct(PathNode* start, PathNode* end)
 
 void path_map_set(int* map, int width, int height)
 {
-    path_map = map;
     path_map_width = width;
     path_map_height = height;
+
+    // create grid of Nodes
+    path_map = calloc(width*height,sizeof(PathNode));
+
+    for(int i = 0; i < height; ++i)
+    {
+        for(int j = 0; j < width; ++j)
+        {
+            int index = i*width + j;
+
+            path_map[index].x = j;
+            path_map[index].y = i;
+            path_map[index].height = map[index];
+        }
+    }
+}
+
+void path_map_free()
+{
+    if(path_map)
+    {
+        free(path_map);
+    }
 }
 
 void path_find(int start_x, int start_y, int end_x, int end_y)
 {
 
-    /*
+#if 0
     // @TEST
     PathNodeQueue q = {0};
     PathNode a,b,c;
@@ -205,7 +226,7 @@ void path_find(int start_x, int start_y, int end_x, int end_y)
     path_print_queue(&q);
 
     return;
-    */
+#endif
 
     if(!path_map)
     {
@@ -213,48 +234,42 @@ void path_find(int start_x, int start_y, int end_x, int end_y)
         return;
     }
 
-    int hs = path_map[start_y*path_map_width + start_x];
+    PathNode* start  = path_get_node_from_map(start_x,start_y);
+    PathNode* target = path_get_node_from_map(end_x,end_y);
 
-    PathNode start = {
-        .x = start_x,
-        .y = start_y,
-        .height = hs,
-    };
-
-    int he = path_map[end_y*path_map_width + end_x];
-
-    PathNode target = {
-        .x = end_x,
-        .y = end_y,
-        .height = he,
-    };
+    printf("start: %c [%p], target: %c [%p]\n",start->height,start,target->height,target);
     
     path_node_enqueue(&path_open,&start);
 
-    PathNode* begin = &path_open.nodes[0];
-
     while(path_open.node_count > 0)
     {
+        path_print_queue(&path_open);
         PathNode* current = path_node_dequeue(&path_open,true);
-        path_node_enqueue(&path_closed,current);
+        printf("current: %c [%p]\n",current->height,current);
 
-        if(current->x == target.x && current->y == target.y)
+        path_node_enqueue(&path_closed,&current);
+
+        if(current == target)
         {
             // Done.
             printf("Done!\n");
-            path_reconstruct(begin,current);
+            printf("g_score: %d, h_score: %d\n", current->g_score, current->h_score);
+            path_reconstruct(start,current);
             return;
         }
 
-        PathNode neighbors[4] = {0};
+        PathNode* neighbors[4] = {0};
         int neighbor_count = path_get_neighbors(current, neighbors, 4);
+        printf("neighbors (%d): ",neighbor_count);
 
-        printf("neighbors (%d)\n", neighbor_count);
         for(int i = 0; i < neighbor_count; ++i)
         {
-            PathNode* neighbor = &neighbors[i];
-            printf("  %d: %c\n",i, neighbors[i].height);
-            if(neighbor->height > current->height+1 || path_node_queue_contains(&path_closed,neighbor))
+            PathNode* neighbor = neighbors[i];
+            printf(" %c", neighbor->height);
+
+
+            bool neighbor_in_closed = path_node_queue_contains(&path_closed,neighbor);
+            if(neighbor->height > current->height+1 || neighbor_in_closed)
             {
                 // not traversible or in closed group
                 continue;
@@ -265,62 +280,19 @@ void path_find(int start_x, int start_y, int end_x, int end_y)
             if(movement_cost_to_neighbor < neighbor->g_score || !neighbor_in_open)
             {
                 neighbor->g_score = movement_cost_to_neighbor;
-                neighbor->h_score = path_node_get_manhatten_distance(neighbor,&target);
+                neighbor->h_score = path_node_get_manhatten_distance(neighbor,target);
+
                 neighbor->parent = current;
 
                 if(!neighbor_in_open)
                 {
-                    path_node_enqueue(&path_open,neighbor);
+                    path_node_enqueue(&path_open,&neighbor);
                 }
-
             }
-
-            
         }
+
+        printf("\n");
+
+        util_wait_until_key_press();
     }
-
-    /*
-
-    // The set of discovered nodes that may need to be (re-)expanded.
-    // Initially, only the start node is known.
-    // This is usually implemented as a min-heap or priority queue rather than a hash-set.
-    openSet := {start}
-    
-
-    // For node n, cameFrom[n] is the node immediately preceding it on the cheapest path from the start
-    // to n currently known.
-    cameFrom := an empty map
-
-    // For node n, gScore[n] is the cost of the cheapest path from start to n currently known.
-    gScore := map with default value of Infinity
-    gScore[start] := 0
-
-    // For node n, fScore[n] := gScore[n] + h(n). fScore[n] represents our current best guess as to
-    // how cheap a path could be from start to finish if it goes through n.
-    fScore := map with default value of Infinity
-    fScore[start] := h(start)
-
-    while openSet is not empty
-        // This operation can occur in O(Log(N)) time if openSet is a min-heap or a priority queue
-        current := the node in openSet having the lowest fScore[] value
-        if current = goal
-            return reconstruct_path(cameFrom, current)
-
-        openSet.Remove(current)
-        for each neighbor of current
-            // d(current,neighbor) is the weight of the edge from current to neighbor
-            // tentative_gScore is the distance from start to the neighbor through current
-            tentative_gScore := gScore[current] + d(current, neighbor)
-            if tentative_gScore < gScore[neighbor]
-                // This path to neighbor is better than any previous one. Record it!
-                cameFrom[neighbor] := current
-                gScore[neighbor] := tentative_gScore
-                fScore[neighbor] := tentative_gScore + h(neighbor)
-                if neighbor not in openSet
-                    openSet.add(neighbor)
-
-    // Open set is empty but goal was never reached
-    return failure
-    */
-
 }
