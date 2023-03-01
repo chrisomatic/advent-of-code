@@ -12,6 +12,7 @@
 #include "common/stack.h"
 #include "common/queue.h"
 #include "common/directory.h"
+#include "common/path.h"
 
 void day1()
 {
@@ -1506,16 +1507,11 @@ void day11()
     printf("2) Monkey Business: %lld\n", monkey_business2);
 }
 
-typedef struct
-{
-    int x,y;
-} Pos;
-
 void day12()
 {
     util_print_day(12);
 
-    char* input_file = "inputs/12.txt";
+    char* input_file = "inputs/12_test.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -1524,12 +1520,12 @@ void day12()
         return;
     }
 
-    int grid[256][256] = {0};
+    int grid[256*256] = {0};
 
     int grid_width = 0, grid_height = 0;
     int row = 0, col = 0;
 
-    Pos start = {0},end = {0};
+    PathPos start = {0},end = {0};
 
     for(;;)
     {
@@ -1546,17 +1542,20 @@ void day12()
             continue;
         }
 
-        grid[row][col] = c;
+        int index = row*grid_width + col;
         if(c == 'S')
         {
             start.x = col;
             start.y = row;
+            c = 'a';
         }
         else if(c == 'E')
         {
             end.x = col;
             end.y = row;
+            c = 'z';
         }
+        grid[index] = c;
         col++;
     }
 
@@ -1570,12 +1569,16 @@ void day12()
     {
         for(int j = 0; j < grid_width; ++j)
         {
-            printf("%c",grid[i][j]);
+            int index = i*grid_width + j;
+            printf("%c",grid[index]);
         }
         printf("\n");
     }
     
 #endif
+
+    path_map_set(grid,grid_width,grid_height);
+    path_find(start.x, start.y, end.x, end.y);
 }
 
 int main(int argc, char* args[])
