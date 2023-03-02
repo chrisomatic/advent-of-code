@@ -1625,28 +1625,131 @@ void day12()
 typedef struct ListNode_t ListNode_t;
 struct ListNode_t
 {
+    bool has_value;
     int value;
     struct ListNode_t* parent;
 
     int num_children;
-    struct ListNode_t* children[10];
+    struct ListNode_t* children[20];
 };
 
-void print_packet(ListNode_t* r)
+void print_packet(ListNode_t* r, int depth)
 {
-    if(r->value > 0)
-        printf("[%d] ",r->value);
+    //printf("depth: %d\n");
+    if(r->has_value)
+    {
+        for(int i = 0 ; i < depth; ++i)
+            printf("-");
+
+        printf("[%d]\n",r->value);
+    }
 
     for(int i = 0; i < r->num_children; ++i)
     {
-        print_packet(r->children[i]);
+        print_packet(r->children[i],depth+1);
     }
 }
 
-void day13_parse_packet(char* str, int len)
+int day13_check_values(ListNode_t* l, ListNode_t* r)
 {
-    ListNode_t root = {0};
-    ListNode_t* current = &root;
+    /*
+        If both values are integers, the lower integer should come first. If the left integer is lower than the right integer, the inputs are in the right order. If the left integer is higher than the right integer, the inputs are not in the right order. Otherwise, the inputs are the same integer; continue checking the next part of the input.
+        If both values are lists, compare the first value of each list, then the second value, and so on. If the left list runs out of items first, the inputs are in the right order. If the right list runs out of items first, the inputs are not in the right order. If the lists are the same length and no comparison makes a decision about the order, continue checking the next part of the input.
+        If exactly one value is an integer, convert the integer to a list which contains that integer as its only value, then retry the comparison. For example, if comparing [0,0,0] and 2, convert the right value to [2] (a list containing 2); the result is then found by instead comparing [0,0,0] and [2].
+    */
+
+    if(l->has_value && r->has_value)
+    {
+        // both values are integers
+        //printf("Comparing [%d] and [%d]\n",l->value,r->value);
+
+        if(l->value < r->value)
+        {
+            // right order
+            return 1;
+        }
+        else if(l->value > r->value)
+        {
+            // not right order
+            return 2;
+        }
+        else
+        {
+            // continue
+            return 0;
+        }
+    }
+
+    if(!l->has_value && !r->has_value)
+    {
+        //printf("Both values are lists!\n");
+
+        // both values are lists
+        for(int i = 0; i < l->num_children; ++i)
+        {
+            if(i >= r->num_children)
+            {
+                // right side runs out of items first
+                // not right order
+                return 2;
+            }
+
+            //printf("Checking child %d in both lists\n",i);
+            int val = day13_check_values(l->children[i], r->children[i]);
+            //printf("Check returned value of %d\n",val);
+            if(val == 0)
+                continue;
+
+            return val;
+        }
+
+        if(r->num_children > l->num_children)
+        {
+            // right order
+            return 1;
+        }
+
+        // continue
+        return 0;
+    }
+
+    // one value is integer, the other is list
+
+    if(l->has_value)
+    {
+        // convert to list
+        ListNode_t* new_node = calloc(sizeof(ListNode_t),1);
+        memcpy(new_node, l, sizeof(ListNode_t));
+
+        l->value = 0;
+        l->has_value = false;
+        l->children[l->num_children++] = new_node;
+
+        int val = day13_check_values(l,r);
+        return val;
+    }
+
+    if(r->has_value)
+    {
+        // convert to list
+        ListNode_t* new_node = calloc(sizeof(ListNode_t),1);
+        memcpy(new_node, r, sizeof(ListNode_t));
+
+        r->value = 0;
+        r->has_value = false;
+        r->children[r->num_children++] = new_node;
+
+        int val = day13_check_values(l,r);
+        return val;
+    }
+
+    return 0;
+}
+
+ListNode_t* day13_parse_packet(char* str, int len)
+{
+    ListNode_t* root = calloc(sizeof(ListNode_t),1);
+    ListNode_t* current = root;
 
     char val_str[5] = {0};
     int val_str_index = 0;
@@ -1670,18 +1773,16 @@ void day13_parse_packet(char* str, int len)
             // end of list
             if(val_str_index > 0)
             {
-                if(val_str_index > 0)
-                {
-                    int val = atoi(val_str);
-                    memset(val_str,0,5);
-                    val_str_index = 0;
+                int val = atoi(val_str);
+                memset(val_str,0,5);
+                val_str_index = 0;
 
-                    ListNode_t* node = calloc(sizeof(ListNode_t),1);
-                    node->value = val;
-                    node->parent = current;
+                ListNode_t* node = calloc(sizeof(ListNode_t),1);
+                node->has_value = true;
+                node->value = val;
+                node->parent = current;
 
-                    current->children[current->num_children++] = node;
-                }
+                current->children[current->num_children++] = node;
             }
             current = current->parent;
         }
@@ -1694,6 +1795,7 @@ void day13_parse_packet(char* str, int len)
                 val_str_index = 0;
 
                 ListNode_t* node = calloc(sizeof(ListNode_t),1);
+                node->has_value = true;
                 node->value = val;
                 node->parent = current;
 
@@ -1706,9 +1808,8 @@ void day13_parse_packet(char* str, int len)
             val_str[val_str_index++] = c;
         }
     }
+    return root;
 
-    print_packet(&root);
-    printf("\n");
 }
 
 void day13()
@@ -1728,18 +1829,51 @@ void day13()
     char pkt1[100+1] = {0};
     char pkt2[100+1] = {0};
 
+    int pair_count = 0;
+
+    int right_indices[100] = {0};
+    int right_indices_count = 0;
+
     for(;;)
     {
         if(fgets(pkt1,100,fp) == NULL) break;
         if(fgets(pkt2,100,fp) == NULL) break;
 
+        //pkt1[strcspn(pkt1, "\n")] = 0;
+        //pkt2[strcspn(pkt2, "\n")] = 0;
+
+        pair_count++;
+
         printf("%s",pkt1);
-        day13_parse_packet(pkt1,100);
+        ListNode_t* l = day13_parse_packet(pkt1,100);
+        //print_packet(l,0);
 
         printf("%s",pkt2);
-        day13_parse_packet(pkt2,100);
+        ListNode_t* r = day13_parse_packet(pkt2,100);
+        //print_packet(r,0);
 
+        int result = day13_check_values(l,r);
+        //printf("=== Pair %d ===\n",pair_count);
+        //printf("%s vs %s\n",pkt1, pkt2);
+        switch(result)
+        {
+            case 0: printf("Unknown\n");     break;
+            case 1: printf("Right Order\n"); right_indices[right_indices_count++] = pair_count; break;
+            case 2: printf("Not Right Order\n"); break;
+        }
+        printf("\n");
+
+        char line[100+1] = {0};
+        if(fgets(line,100,fp) == NULL) break;
     }
+
+    int sum = 0;
+    for(int i = 0; i < right_indices_count; ++i)
+    {
+        sum += right_indices[i];
+    }
+
+    printf("1) Sum of Right indices: %d\n", sum);
 }
 
 int main(int argc, char* args[])
