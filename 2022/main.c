@@ -1621,17 +1621,124 @@ void day12()
     
 }
 
+
+typedef struct ListNode_t ListNode_t;
+struct ListNode_t
+{
+    int value;
+    struct ListNode_t* parent;
+
+    int num_children;
+    struct ListNode_t* children[10];
+};
+
+void print_packet(ListNode_t* r)
+{
+    if(r->value > 0)
+        printf("[%d] ",r->value);
+
+    for(int i = 0; i < r->num_children; ++i)
+    {
+        print_packet(r->children[i]);
+    }
+}
+
+void day13_parse_packet(char* str, int len)
+{
+    ListNode_t root = {0};
+    ListNode_t* current = &root;
+
+    char val_str[5] = {0};
+    int val_str_index = 0;
+
+    for(int i = 0; i < len; ++i)
+    {
+        int c = str[i];
+        if(c == '\n' || c == '\0')
+            break;
+
+        if(c == '[')
+        {
+            // start of list
+            ListNode_t* node = calloc(sizeof(ListNode_t),1);
+            node->parent = current;
+            current->children[current->num_children++] = node;
+            current = node;
+        }
+        else if(c == ']')
+        {
+            // end of list
+            if(val_str_index > 0)
+            {
+                if(val_str_index > 0)
+                {
+                    int val = atoi(val_str);
+                    memset(val_str,0,5);
+                    val_str_index = 0;
+
+                    ListNode_t* node = calloc(sizeof(ListNode_t),1);
+                    node->value = val;
+                    node->parent = current;
+
+                    current->children[current->num_children++] = node;
+                }
+            }
+            current = current->parent;
+        }
+        else if(c == ',')
+        {
+            if(val_str_index > 0)
+            {
+                int val = atoi(val_str);
+                memset(val_str,0,5);
+                val_str_index = 0;
+
+                ListNode_t* node = calloc(sizeof(ListNode_t),1);
+                node->value = val;
+                node->parent = current;
+
+                current->children[current->num_children++] = node;
+            }
+        }
+        else
+        {
+            // presumably some number between 0-9
+            val_str[val_str_index++] = c;
+        }
+    }
+
+    print_packet(&root);
+    printf("\n");
+}
+
 void day13()
 {
     util_print_day(13);
 
-    char* input_file = "inputs/13.txt";
+    char* input_file = "inputs/13_test.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
     {
         printf("Failed to open input file: %s\n",input_file);
         return;
+    }
+
+    // parse input
+    char pkt1[100+1] = {0};
+    char pkt2[100+1] = {0};
+
+    for(;;)
+    {
+        if(fgets(pkt1,100,fp) == NULL) break;
+        if(fgets(pkt2,100,fp) == NULL) break;
+
+        printf("%s",pkt1);
+        day13_parse_packet(pkt1,100);
+
+        printf("%s",pkt2);
+        day13_parse_packet(pkt2,100);
+
     }
 }
 
