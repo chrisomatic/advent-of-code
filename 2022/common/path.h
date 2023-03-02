@@ -77,7 +77,7 @@ PathNode* path_node_dequeue(PathNodeQueue* q, bool use_priority)
     int remaining_nodes = q->node_count - lowest_index -1;
     if(remaining_nodes > 0)
     {
-        memmove(min,min+1,remaining_nodes*sizeof(PathNode));
+        memmove(&q->nodes[lowest_index],&q->nodes[lowest_index+1],remaining_nodes*sizeof(PathNode));
     }
 
     q->node_count--;
@@ -117,8 +117,6 @@ int path_get_neighbors(PathNode* n, PathNode* neighbors[], int direction_count)
     int x = n->x;
     int y = n->y;
 
-    printf("current: %d, %d\n",x,y);
-
     PathPos up    = {.x = x, .y = y - 1};
     PathPos down  = {.x = x, .y = y + 1};
     PathPos left  = {.x = x - 1, .y = y};
@@ -156,7 +154,6 @@ void path_reconstruct(PathNode* start, PathNode* end)
     while(current && current != start)
     {
         path_node_enqueue(&path, &current);
-        printf("[%p]->[%p]\n",current,current->parent);
         if(current->parent == current)
             break;
         
@@ -193,6 +190,21 @@ void path_map_set(int* map, int width, int height)
     }
 }
 
+void path_map_reset()
+{
+    for(int i = 0; i < path_map_height; ++i)
+    {
+        for(int j = 0; j < path_map_width; ++j)
+        {
+            int index = i*path_map_width + j;
+
+            path_map[index].g_score = 0;
+            path_map[index].h_score = 0;
+            path_map[index].parent = NULL;
+        }
+    }
+}
+
 void path_map_free()
 {
     if(path_map)
@@ -201,32 +213,8 @@ void path_map_free()
     }
 }
 
-void path_find(int start_x, int start_y, int end_x, int end_y)
+int path_find(int start_x, int start_y, int end_x, int end_y)
 {
-
-#if 0
-    // @TEST
-    PathNodeQueue q = {0};
-    PathNode a,b,c;
-
-    a.height = 'a'; a.g_score = 2;
-    b.height = 'b'; b.g_score = 1;
-    c.height = 'c'; c.g_score = 3;
-
-    path_node_enqueue(&q,&a);
-    path_node_enqueue(&q,&b);
-    path_node_enqueue(&q,&c);
-
-    path_print_queue(&q);
-
-    path_node_dequeue(&q,false);
-    path_print_queue(&q);
-
-    path_node_dequeue(&q,false);
-    path_print_queue(&q);
-
-    return;
-#endif
 
     if(!path_map)
     {
@@ -234,39 +222,39 @@ void path_find(int start_x, int start_y, int end_x, int end_y)
         return;
     }
 
+    // initialize vars for run
+    path_open.node_count = 0;
+    path_closed.node_count = 0;
+    path_map_reset();
+
     PathNode* start  = path_get_node_from_map(start_x,start_y);
     PathNode* target = path_get_node_from_map(end_x,end_y);
 
-    printf("start: %c [%p], target: %c [%p]\n",start->height,start,target->height,target);
-    
     path_node_enqueue(&path_open,&start);
 
     while(path_open.node_count > 0)
     {
-        path_print_queue(&path_open);
+        //path_print_queue(&path_open);
         PathNode* current = path_node_dequeue(&path_open,true);
-        printf("current: %c [%p]\n",current->height,current);
 
         path_node_enqueue(&path_closed,&current);
 
         if(current == target)
         {
             // Done.
-            printf("Done!\n");
-            printf("g_score: %d, h_score: %d\n", current->g_score, current->h_score);
-            path_reconstruct(start,current);
-            return;
+            //printf("Path Score: %d\n", current->g_score);
+            //printf("g_score: %d, h_score: %d\n", current->g_score, current->h_score);
+            //path_reconstruct(start,current);
+
+            return current->g_score;
         }
 
         PathNode* neighbors[4] = {0};
         int neighbor_count = path_get_neighbors(current, neighbors, 4);
-        printf("neighbors (%d): ",neighbor_count);
 
         for(int i = 0; i < neighbor_count; ++i)
         {
             PathNode* neighbor = neighbors[i];
-            printf(" %c", neighbor->height);
-
 
             bool neighbor_in_closed = path_node_queue_contains(&path_closed,neighbor);
             if(neighbor->height > current->height+1 || neighbor_in_closed)
@@ -291,8 +279,8 @@ void path_find(int start_x, int start_y, int end_x, int end_y)
             }
         }
 
-        printf("\n");
-
-        util_wait_until_key_press();
+        //util_wait_until_key_press();
     }
+
+    return -1;
 }

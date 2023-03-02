@@ -1511,7 +1511,7 @@ void day12()
 {
     util_print_day(12);
 
-    char* input_file = "inputs/12_test.txt";
+    char* input_file = "inputs/12.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -1578,8 +1578,61 @@ void day12()
 #endif
 
     path_map_set(grid,grid_width,grid_height);
-    path_find(start.x, start.y, end.x, end.y);
+    int part1_path_len = path_find(start.x, start.y, end.x, end.y);
+
+    printf("1) Shortest path: %d\n",part1_path_len);
+
+    // part 2
+
+    // gather all potential starting points
+    PathPos starting_points[3000] = {0};
+    int starting_points_count = 0;
+    
+    for(int i = 0; i < grid_height; ++i)
+    {
+        for(int j = 0; j < grid_width; ++j)
+        {
+            int c = grid[i*grid_width+j];
+            if(c == 'a')
+            {
+                starting_points[starting_points_count].x = j;
+                starting_points[starting_points_count].y = i;
+                starting_points_count++;
+            }
+        }
+    }
+
+    // test all starting points
+    // store minimum path length
+    int minimum_path_len = INT_MAX;
+    
+    for(int i = 0; i < starting_points_count; ++i)
+    {
+        //printf("Checking %d/%d...\n",i,starting_points_count);
+        int path_len = path_find(starting_points[i].x, starting_points[i].y, end.x, end.y);
+        if(path_len > 0 && path_len < minimum_path_len)
+        {
+            minimum_path_len = path_len;
+        }
+    }
+
+    printf("2) Absolute Shortest Path: %d\n",minimum_path_len);
     path_map_free();
+    
+}
+
+void day13()
+{
+    util_print_day(13);
+
+    char* input_file = "inputs/13.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
 }
 
 int main(int argc, char* args[])
@@ -1597,7 +1650,8 @@ int main(int argc, char* args[])
     day9();
     day10();
     day11();
-    day12();
+    //day12(); // comment-out due to substantial runtime
+    day13();
 
     printf("\n======================================================\n");
     return 0;

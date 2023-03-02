@@ -16,8 +16,8 @@ https://adventofcode.com/
 | 8 - Treetop Tree House | :star: | :star: |
 | 9 - Rope Bridge | :star: | :star: |
 | 10 - Cathode-Ray Tube | :star: | :star: |
-| 11 - Monkey in the Middle | :star: | |
-| 12 | | |
+| 11 - Monkey in the Middle | :star: | :star: |
+| 12 - Hill Climbing Algorithm | :star: | :star: |
 | 13 | | |
 | 14 | | |
 | 15 | | |
