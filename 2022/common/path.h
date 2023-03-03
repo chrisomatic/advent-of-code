@@ -219,7 +219,7 @@ int path_find(int start_x, int start_y, int end_x, int end_y)
     if(!path_map)
     {
         printf("Path Map is not set!\n");
-        return;
+        return -1;
     }
 
     // initialize vars for run

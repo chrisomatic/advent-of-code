@@ -1626,6 +1626,7 @@ typedef struct ListNode_t ListNode_t;
 struct ListNode_t
 {
     bool has_value;
+    bool is_divider; // for part 2
     int value;
     struct ListNode_t* parent;
 
@@ -1812,11 +1813,27 @@ ListNode_t* day13_parse_packet(char* str, int len)
 
 }
 
+void day13_sort_packets(ListNode_t* arr[], int n)
+{
+    int i, j;
+    ListNode_t* key;
+    for (i = 1; i < n; i++) {
+        key = arr[i];
+        j = i - 1;
+ 
+        while (j >= 0 && day13_check_values(key,arr[j]) == 1) {
+            arr[j + 1] = arr[j];
+            j = j - 1;
+        }
+        arr[j + 1] = key;
+    }
+}
+
 void day13()
 {
     util_print_day(13);
 
-    char* input_file = "inputs/13_test.txt";
+    char* input_file = "inputs/13.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -1826,45 +1843,43 @@ void day13()
     }
 
     // parse input
-    char pkt1[100+1] = {0};
-    char pkt2[100+1] = {0};
+    char pkt1[300+1] = {0};
+    char pkt2[300+1] = {0};
 
     int pair_count = 0;
 
     int right_indices[100] = {0};
     int right_indices_count = 0;
 
+    ListNode_t* all_packets[302];
+    int packet_count = 0;
+
     for(;;)
     {
-        if(fgets(pkt1,100,fp) == NULL) break;
-        if(fgets(pkt2,100,fp) == NULL) break;
-
-        //pkt1[strcspn(pkt1, "\n")] = 0;
-        //pkt2[strcspn(pkt2, "\n")] = 0;
+        if(fgets(pkt1,300,fp) == NULL) break;
+        if(fgets(pkt2,300,fp) == NULL) break;
 
         pair_count++;
 
-        printf("%s",pkt1);
+        //printf("%s",pkt1);
         ListNode_t* l = day13_parse_packet(pkt1,100);
-        //print_packet(l,0);
-
-        printf("%s",pkt2);
+        all_packets[packet_count++] = l;
+        
+        //printf("%s",pkt2);
         ListNode_t* r = day13_parse_packet(pkt2,100);
-        //print_packet(r,0);
+        all_packets[packet_count++] = r;
 
         int result = day13_check_values(l,r);
-        //printf("=== Pair %d ===\n",pair_count);
-        //printf("%s vs %s\n",pkt1, pkt2);
-        switch(result)
+        if(result == 1)
         {
-            case 0: printf("Unknown\n");     break;
-            case 1: printf("Right Order\n"); right_indices[right_indices_count++] = pair_count; break;
-            case 2: printf("Not Right Order\n"); break;
+            right_indices[right_indices_count++] = pair_count;
         }
-        printf("\n");
 
+        // eat empty line between
         char line[100+1] = {0};
         if(fgets(line,100,fp) == NULL) break;
+
+        //util_wait_until_key_press();
     }
 
     int sum = 0;
@@ -1873,8 +1888,43 @@ void day13()
         sum += right_indices[i];
     }
 
-    printf("1) Sum of Right indices: %d\n", sum);
+    printf("1) Sum of Right-Order indices: %d\n", sum);
+
+
+    // part 2
+    // go through all packets and order them...
+
+    // todo: add in divider packets
+    char* divider1 = "[[2]]\n";
+    char* divider2 = "[[6]]\n";
+
+    ListNode_t* d1 = day13_parse_packet(divider1,5);
+    ListNode_t* d2 = day13_parse_packet(divider2,5);
+
+    d1->is_divider = true;
+    d2->is_divider = true;
+
+    all_packets[packet_count++] = d1;
+    all_packets[packet_count++] = d2;
+    
+    day13_sort_packets(all_packets, packet_count);
+
+    int decoder_signal = 1;
+    for(int i = 0; i < packet_count; ++i)
+    {
+        int index = i-packet_count+2;
+        //printf("%d/%d\n",i+1,packet_count);
+        //print_packet(all_packets[i],0);
+        if(all_packets[i]->is_divider)
+        {
+            decoder_signal *= (i+1);
+        }
+        //util_wait_until_key_press();
+    }
+    
+    printf("2) decoder_signal: %d\n",decoder_signal);
 }
+
 
 int main(int argc, char* args[])
 {

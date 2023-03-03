@@ -18,7 +18,7 @@ https://adventofcode.com/
 | 10 - Cathode-Ray Tube | :star: | :star: |
 | 11 - Monkey in the Middle | :star: | :star: |
 | 12 - Hill Climbing Algorithm | :star: | :star: |
-| 13 | | |
+| 13 - Distress Signal | :star: | :star: |
 | 14 | | |
 | 15 | | |
 | 16 | | |
