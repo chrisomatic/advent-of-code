@@ -1507,11 +1507,13 @@ void day11()
     printf("2) Monkey Business: %lld\n", monkey_business2);
 }
 
-void day12()
+void day12(bool test)
 {
     util_print_day(12);
 
-    char* input_file = "inputs/12.txt";
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/12_test.txt" : "inputs/12.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -1561,10 +1563,10 @@ void day12()
 
     grid_height = row;
 
-    printf("Grid (%d x %d)\n", grid_width, grid_height);
-    printf("S [%d,%d] -> E [%d,%d]\n",start.x,start.y,end.x,end.y);
+    //printf("Grid (%d x %d)\n", grid_width, grid_height);
+    //printf("S [%d,%d] -> E [%d,%d]\n",start.x,start.y,end.x,end.y);
 
-#if 1
+#if 0
     for(int i = 0; i < grid_height; ++i)
     {
         for(int j = 0; j < grid_width; ++j)
@@ -2102,11 +2104,13 @@ int day14_simulate_sand(Path* paths, int path_count, int floor)
     return sand_count;
 }
 
-void day14()
+void day14(bool test)
 {
     util_print_day(14);
 
-    char* input_file = "inputs/14.txt";
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/14_test.txt" : "inputs/14.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -2181,6 +2185,20 @@ void day14()
 
 }
 
+void day15()
+{
+    util_print_day(15);
+
+    char* input_file = "inputs/15_test.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+}
+
 int main(int argc, char* args[])
 {
     printf("\n===================== AOC 2022 =======================\n");
@@ -2196,9 +2214,9 @@ int main(int argc, char* args[])
     day9();
     day10();
     day11();
-    //day12(); // comment-out due to substantial runtime
+    day12(true); // looking at test file due to substantial runtime
     day13();
-    //day14(); // comment-out due to substantial runtime
+    day14(true); // looking at test file due to substantial runtime
     day15();
 
     printf("\n======================================================\n");
