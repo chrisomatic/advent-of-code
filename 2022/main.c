@@ -1925,6 +1925,261 @@ void day13()
     printf("2) decoder_signal: %d\n",decoder_signal);
 }
 
+typedef struct
+{
+    int x,y;
+} PathPoint;
+
+typedef struct
+{
+    PathPoint points[32];
+    int point_count;
+} Path;
+
+bool is_point_rock(int x, int y, Path* paths, int path_count, int y_floor)
+{
+    if(y_floor > -1)
+    {
+        if(y >= y_floor)
+        {
+            return true;
+        }
+    }
+
+    for(int i = 0; i < path_count; ++i)
+    {
+        for(int j = 0; j < paths[i].point_count; ++j)
+        {
+            PathPoint* p1 = &paths[i].points[j];
+            PathPoint* p2 = j == paths[i].point_count - 1 ? p1 : &paths[i].points[j+1];
+
+            //printf("p1: %d, %d; p2: %d, %d\n",p1->x, p1->y, p2->x, p2->y);
+
+            int delta_x = p2->x - p1->x;
+            int delta_y = p2->y - p1->y;
+
+            int x_dir = delta_x < 0 ? -1 : +1;
+            int y_dir = delta_y < 0 ? -1 : +1;
+
+            int abs_x = ABS(delta_x);
+            int abs_y = ABS(delta_y);
+
+            for(int k = 0; k <= abs_x; ++k)
+            {
+                for(int l = 0; l <= abs_y; ++l)
+                {
+                    PathPoint check = {
+                        .x = p1->x + x_dir*k,
+                        .y = p1->y + y_dir*l
+                    };
+
+                    //printf("checking %d,%d\n",check.x,check.y);
+
+                    if(x == check.x && y == check.y)
+                    {
+                        return true;
+                    }
+                }
+
+            }
+        }
+    }
+
+    return false;
+}
+
+bool is_point_sand(int x, int y, PathPoint* sand, int sand_count)
+{
+    for(int i = 0; i < sand_count; ++i)
+    {
+        if(sand[i].x == x && sand[i].y == y)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool is_point_solid(int x, int y, Path* paths, int path_count, PathPoint* sand, int sand_count, int floor)
+{
+    if(is_point_rock(x,y,paths,path_count,floor) || is_point_sand(x,y,sand,sand_count))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+int day14_simulate_sand(Path* paths, int path_count, int floor)
+{
+    PathPoint sand[100000] = {0};
+    int sand_count = 0;
+    
+    PathPoint s = {500,0};
+
+    for(;;)
+    {
+        if(!is_point_solid(s.x,s.y+1,paths,path_count,sand,sand_count, floor))
+        {
+            // down
+            s.y++;
+
+            if(floor == -1 && s.y >= 1000)
+            {
+                // ABYSS
+                break;
+            }
+
+            continue;
+        }
+
+        if(!is_point_solid(s.x-1, s.y+1, paths,path_count,sand,sand_count, floor))
+        {
+            // down left
+            s.x--;
+            s.y++;
+            continue;
+
+        }
+
+        if(!is_point_solid(s.x+1, s.y+1, paths,path_count,sand,sand_count, floor))
+        {
+            // down right
+            s.x++;
+            s.y++;
+            continue;
+        }
+
+
+        // come to rest
+        // add sand to list
+        memcpy(&sand[sand_count++], &s, sizeof(PathPoint));
+
+        if(floor > -1)
+        {
+            // check if still at origin
+            if(s.x == 500 && s.y == 0)
+            {
+                // done
+                break;
+            }
+        }
+
+
+        s.x = 500;
+        s.y = 0;
+    }
+
+#if 0
+        // print grid
+        for(int i = 0; i <= 9; ++i)
+        {
+            for(int j = 494; j <= 503; ++j)
+            {
+                if(is_point_rock(j,i,paths, path_count,floor))
+                {
+                    printf("#"); // rock
+                }
+                else if(is_point_sand(j,i,sand, sand_count))
+                {
+                    printf("o"); // landed sand
+                }
+                else if(s.x == j && s.y == i)
+                {
+                    printf("+"); // current sand
+                }
+                else
+                {
+                    printf("."); // air
+                }
+            }
+            printf("\n");
+        }
+
+        util_wait_until_key_press();
+#endif
+
+    return sand_count;
+}
+
+void day14()
+{
+    util_print_day(14);
+
+    char* input_file = "inputs/14.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    Path all_paths[200] = {0};
+    int path_count = 0;
+
+    // parse rock paths
+    char line[300+1] = {0};
+    for(;;)
+    {
+        if(fgets(line,300,fp) == NULL)
+            break;
+
+        Path path = {0};
+
+        char* token = strtok(line, "->");
+
+        while(token)
+        {
+            PathPoint p = {0};
+            int matches = sscanf(token,"%d,%d",&p.x,&p.y);
+            if(matches == 2)
+            {
+                path.points[path.point_count].x = p.x;
+                path.points[path.point_count].y = p.y;
+                path.point_count++;
+            }
+
+            token = strtok(NULL, "->");
+        }
+
+        memcpy(&all_paths[path_count++],&path, sizeof(Path));
+    }
+
+    int grid_x_min = INT_MAX;
+    int grid_x_max = 0;
+
+    int grid_y_min = 0;
+    int grid_y_max = 0;
+
+    for(int i = 0; i < path_count; ++i)
+    {
+        for(int j = 0; j < all_paths[i].point_count; ++j)
+        {
+            PathPoint* p = &all_paths[i].points[j];
+
+            if(p->x < grid_x_min)
+                grid_x_min = p->x;
+
+            if(p->x > grid_x_max)
+                grid_x_max = p->x;
+
+            if(p->y > grid_y_max)
+                grid_y_max = p->y;
+        }
+    }
+
+    int sand_count;
+
+    // part 1
+    sand_count = day14_simulate_sand(all_paths, path_count,-1);
+    printf("1) Sand Count: %d\n",sand_count);
+
+    // part 2
+    sand_count = day14_simulate_sand(all_paths, path_count,grid_y_max+2);
+    printf("2) Sand Count: %d\n",sand_count);
+
+}
 
 int main(int argc, char* args[])
 {
@@ -1943,6 +2198,8 @@ int main(int argc, char* args[])
     day11();
     //day12(); // comment-out due to substantial runtime
     day13();
+    //day14(); // comment-out due to substantial runtime
+    day15();
 
     printf("\n======================================================\n");
     return 0;

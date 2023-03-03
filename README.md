@@ -19,7 +19,7 @@ https://adventofcode.com/
 | 11 - Monkey in the Middle | :star: | :star: |
 | 12 - Hill Climbing Algorithm | :star: | :star: |
 | 13 - Distress Signal | :star: | :star: |
-| 14 | | |
+| 14 - Regolith Reservoir | :star: | :star: |
 | 15 | | |
 | 16 | | |
 | 17 | | |
