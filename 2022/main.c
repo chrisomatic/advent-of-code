@@ -1929,12 +1929,7 @@ void day13()
 
 typedef struct
 {
-    int x,y;
-} PathPoint;
-
-typedef struct
-{
-    PathPoint points[32];
+    Vec2i points[32];
     int point_count;
 } Path;
 
@@ -1952,8 +1947,8 @@ bool is_point_rock(int x, int y, Path* paths, int path_count, int y_floor)
     {
         for(int j = 0; j < paths[i].point_count; ++j)
         {
-            PathPoint* p1 = &paths[i].points[j];
-            PathPoint* p2 = j == paths[i].point_count - 1 ? p1 : &paths[i].points[j+1];
+            Vec2i* p1 = &paths[i].points[j];
+            Vec2i* p2 = j == paths[i].point_count - 1 ? p1 : &paths[i].points[j+1];
 
             //printf("p1: %d, %d; p2: %d, %d\n",p1->x, p1->y, p2->x, p2->y);
 
@@ -1970,7 +1965,7 @@ bool is_point_rock(int x, int y, Path* paths, int path_count, int y_floor)
             {
                 for(int l = 0; l <= abs_y; ++l)
                 {
-                    PathPoint check = {
+                    Vec2i check = {
                         .x = p1->x + x_dir*k,
                         .y = p1->y + y_dir*l
                     };
@@ -1990,7 +1985,7 @@ bool is_point_rock(int x, int y, Path* paths, int path_count, int y_floor)
     return false;
 }
 
-bool is_point_sand(int x, int y, PathPoint* sand, int sand_count)
+bool is_point_sand(int x, int y, Vec2i* sand, int sand_count)
 {
     for(int i = 0; i < sand_count; ++i)
     {
@@ -2002,7 +1997,7 @@ bool is_point_sand(int x, int y, PathPoint* sand, int sand_count)
     return false;
 }
 
-bool is_point_solid(int x, int y, Path* paths, int path_count, PathPoint* sand, int sand_count, int floor)
+bool is_point_solid(int x, int y, Path* paths, int path_count, Vec2i* sand, int sand_count, int floor)
 {
     if(is_point_rock(x,y,paths,path_count,floor) || is_point_sand(x,y,sand,sand_count))
     {
@@ -2014,10 +2009,10 @@ bool is_point_solid(int x, int y, Path* paths, int path_count, PathPoint* sand, 
 
 int day14_simulate_sand(Path* paths, int path_count, int floor)
 {
-    PathPoint sand[100000] = {0};
+    Vec2i sand[100000] = {0};
     int sand_count = 0;
     
-    PathPoint s = {500,0};
+    Vec2i s = {500,0};
 
     for(;;)
     {
@@ -2055,7 +2050,7 @@ int day14_simulate_sand(Path* paths, int path_count, int floor)
 
         // come to rest
         // add sand to list
-        memcpy(&sand[sand_count++], &s, sizeof(PathPoint));
+        memcpy(&sand[sand_count++], &s, sizeof(Vec2i));
 
         if(floor > -1)
         {
@@ -2135,7 +2130,7 @@ void day14(bool test)
 
         while(token)
         {
-            PathPoint p = {0};
+            Vec2i p = {0};
             int matches = sscanf(token,"%d,%d",&p.x,&p.y);
             if(matches == 2)
             {
@@ -2160,7 +2155,7 @@ void day14(bool test)
     {
         for(int j = 0; j < all_paths[i].point_count; ++j)
         {
-            PathPoint* p = &all_paths[i].points[j];
+            Vec2i* p = &all_paths[i].points[j];
 
             if(p->x < grid_x_min)
                 grid_x_min = p->x;
@@ -2185,6 +2180,18 @@ void day14(bool test)
 
 }
 
+typedef struct
+{
+    Vec2i sensor;
+    Vec2i beacon;
+    int distance;
+} SensorReading;
+
+int manhatten_dist(int x1, int y1, int x2, int y2)
+{
+    return (ABS(x2 - x1) + ABS(y2 - y1));
+}
+
 void day15()
 {
     util_print_day(15);
@@ -2196,6 +2203,86 @@ void day15()
     {
         printf("Failed to open input file: %s\n",input_file);
         return;
+    }
+
+    char line[100+1] = {0};
+
+    SensorReading readings[100] = {0};
+    int num_readings = 0;
+
+    // parse out sensors and beacons
+    for(;;)
+    {
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        SensorReading r;
+
+        sscanf(line,"Sensor at x=%d, y=%d: closest beacon is at x=%d, y=%d\n",&r.sensor.x, &r.sensor.y, &r.beacon.x, &r.beacon.y);
+
+        memcpy(&readings[num_readings++],&r, sizeof(SensorReading));
+    }
+
+    // get ranges
+    int x_min = INT_MAX;
+    int x_max = 0;
+
+    int y_min = INT_MAX;
+    int y_max = 0;
+
+    for(int i = 0; i < num_readings; ++i)
+    {
+        SensorReading* r = &readings[i];
+        r->distance = manhatten_dist(r->sensor.x, r->sensor.y, r->beacon.x, r->beacon.y);
+
+        if(r->sensor.x < x_min) x_min = r->sensor.x;
+        if(r->sensor.y < y_min) y_min = r->sensor.y;
+        if(r->sensor.x > x_max) x_max = r->sensor.x;
+        if(r->sensor.y > y_max) y_max = r->sensor.y;
+
+        if(r->beacon.x < x_min) x_min = r->beacon.x;
+        if(r->beacon.y < y_min) y_min = r->beacon.y;
+        if(r->beacon.x > x_max) x_max = r->beacon.x;
+        if(r->beacon.y > y_max) y_max = r->beacon.y;
+    }
+
+    // build visual grid
+    char visual_grid[100][100] = {0};
+
+    for(int j = y_min; j <= y_max; ++j)
+    {
+        for(int i = x_min; i <= x_max; ++i)
+        {
+            bool has_object = false;
+            char c = '.';
+
+            for(int k = 0; k < num_readings; ++k)
+            {
+                SensorReading* r = &readings[k];
+                if(r->sensor.x == i && r->sensor.y == j)
+                {
+                    c = 'S';
+                    break;
+                }
+
+                if(r->beacon.x == i && r->beacon.y == j)
+                {
+                    c = 'B';
+                    break;
+                }
+            }
+
+            visual_grid[i-x_min][j-y_min] = c;
+        }
+    }
+
+    for(int j = 0; j <= y_max-y_min; ++j)
+    {
+        for(int i = 0; i <= x_max-x_min; ++i)
+        {
+            printf("%c",visual_grid[i][j]);
+        }
+        printf("\n");
     }
 }
 
@@ -2214,9 +2301,9 @@ int main(int argc, char* args[])
     day9();
     day10();
     day11();
-    day12(true); // looking at test file due to substantial runtime
+    day12(1); // looking at test file due to substantial runtime
     day13();
-    day14(true); // looking at test file due to substantial runtime
+    day14(1); // looking at test file due to substantial runtime
     day15();
 
     printf("\n======================================================\n");

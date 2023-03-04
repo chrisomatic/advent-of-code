@@ -4,7 +4,12 @@
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
-#define ABS(x) ((x) < 0 ? -1*(x) : (x));
+#define ABS(x) ((x) < 0 ? -1*(x) : (x))
+
+typedef struct
+{
+    int x,y;
+} Vec2i;
 
 void util_print_day(int day)
 {
