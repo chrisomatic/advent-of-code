@@ -2196,7 +2196,7 @@ void day15()
 {
     util_print_day(15);
 
-    char* input_file = "inputs/15_test.txt";
+    char* input_file = "inputs/15.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -2247,6 +2247,7 @@ void day15()
     }
 
     // build visual grid
+#if 0
     char visual_grid[100][100] = {0};
 
     for(int j = y_min; j <= y_max; ++j)
@@ -2283,6 +2284,73 @@ void day15()
             printf("%c",visual_grid[i][j]);
         }
         printf("\n");
+    }
+#endif
+
+    // part 1
+    // scan y=10 for a decent range of x
+    int num_cannot_contain_beacon = 0;
+    int y = 2000000;
+    for(int x = -10000000; x <= 10000000; ++x)
+    {
+        for(int i = 0; i < num_readings; ++i)
+        {
+            SensorReading* r = &readings[i];
+            int dist = manhatten_dist(x,y,r->sensor.x,r->sensor.y);
+
+            if(x == r->beacon.x && y == r->beacon.y)
+                continue;
+            
+            if(dist <= r->distance)
+            {
+                num_cannot_contain_beacon++;
+                //printf("x=%d\n",x);
+                break;
+            }
+        }
+    }
+
+    printf("1) # Cannot contain beacon: %d\n",num_cannot_contain_beacon);
+
+    // part 2
+    // find the distress beacon
+    // x,y can be no lower than 0 and no larger than 4,000,000
+    for(int i = 0; i < num_readings; ++i)
+    {
+        SensorReading* r = &readings[i];
+        printf("(x-%f)^2 + (y-%f)^2 = %f^2\n",r->sensor.x/1000000.0, r->sensor.y/1000000.0, r->distance/1000000.0);
+    }
+
+    for(int x = 1680000; x <= 1720000; ++x)
+    {
+        for(int y = 2480000; y <= 2520000; ++y)
+        {
+            bool possible_beacon = true;
+
+            for(int i = 0; i < num_readings; ++i)
+            {
+                SensorReading* r = &readings[i];
+                int dist = manhatten_dist(x,y,r->sensor.x,r->sensor.y);
+
+                //if(x == r->beacon.x && y == r->beacon.y)
+                //    continue;
+
+                //if(x == r->sensor.x && y == r->sensor.y)
+                //    continue;
+
+                if(dist <= r->distance)
+                {
+                    //printf("dist %d not greater than radius of %d, sensor @ %d, %d, r= %d\n", dist, r->distance, r->sensor.x,r->sensor.y, r->distance);
+                    possible_beacon = false;
+                    break;
+                }
+
+            }
+            if(possible_beacon)
+            {
+                printf("Possible Beacon at %d, %d\n",x,y);
+            }
+        }
     }
 }
 
