@@ -2315,15 +2315,28 @@ void day15()
     // part 2
     // find the distress beacon
     // x,y can be no lower than 0 and no larger than 4,000,000
+    
+    /*
+    // printing out points for plotting data
     for(int i = 0; i < num_readings; ++i)
     {
         SensorReading* r = &readings[i];
-        printf("(x-%f)^2 + (y-%f)^2 = %f^2\n",r->sensor.x/1000000.0, r->sensor.y/1000000.0, r->distance/1000000.0);
-    }
 
-    for(int x = 1680000; x <= 1720000; ++x)
+        float x   = r->sensor.x/1000000.0;
+        float y   = r->sensor.y/1000000.0;
+        float rad = r->distance/1000000.0;
+
+        printf("(%f,%f) (%f,%f) (%f,%f) (%f,%f)\n",x-rad,y,x,y+rad,x+rad,y,x,y-rad);
+    }
+    */
+
+    // this range looked promising after plotting the sensors areas
+    // So focusing on it
+
+    long tuning_freq = 0;
+    for(int x = 2550000; x <= 2580000; ++x)
     {
-        for(int y = 2480000; y <= 2520000; ++y)
+        for(int y = 3250000; y <= 3280000; ++y)
         {
             bool possible_beacon = true;
 
@@ -2331,12 +2344,6 @@ void day15()
             {
                 SensorReading* r = &readings[i];
                 int dist = manhatten_dist(x,y,r->sensor.x,r->sensor.y);
-
-                //if(x == r->beacon.x && y == r->beacon.y)
-                //    continue;
-
-                //if(x == r->sensor.x && y == r->sensor.y)
-                //    continue;
 
                 if(dist <= r->distance)
                 {
@@ -2346,12 +2353,169 @@ void day15()
                 }
 
             }
+
             if(possible_beacon)
             {
-                printf("Possible Beacon at %d, %d\n",x,y);
+                // 8355556222683
+                //printf("Possible Beacon at %d, %d (%ld)\n",x,y,(long)x*4000000 + y);
+                tuning_freq = (long)x*4000000+y;
+                goto found_beacon;
             }
         }
     }
+
+found_beacon:
+    printf("2) Tuning Frequency: %ld\n",tuning_freq);
+
+}
+
+typedef struct Valve Valve;
+struct Valve
+{
+    char name[3];
+    char tunnel_str[20];
+    int flow_rate;
+    int tunnel_count;
+    struct Valve* tunnels[8];
+    bool open;
+};
+
+void day16()
+{
+    util_print_day(16);
+
+    char* input_file = "inputs/16_test.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    Valve valves[50] = {0};
+    int valve_count = 0;
+
+    char line[100+1] = {0};
+    for(;;)
+    {
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        Valve v = {0};
+
+        int num_matches = sscanf(line, "Valve %s has flow rate=%d;",&v.name,&v.flow_rate);
+
+        // get tunnels
+        char* tunnels = strstr(line,";");
+        if(!tunnels)
+            continue;
+
+        char tunnel_str[20] = {0};
+        int tunnel_str_index = 0;
+
+        for(int i = 0; i < strlen(tunnels); ++i)
+        {
+            char c = tunnels[i];
+            if(c >= 'A' && c <= 'Z')
+            {
+                // tunnel
+                v.tunnel_str[tunnel_str_index++] = c;
+            }
+            else if(c == ',')
+            {
+                v.tunnel_count++;
+                v.tunnel_str[tunnel_str_index++] = ',';
+            }
+        }
+        v.tunnel_count++;
+
+        memcpy(&valves[valve_count++],&v,sizeof(Valve));
+    }
+
+    // fill out valve pointers
+    for(int i = 0; i < valve_count; ++i)
+    {
+        Valve* v = &valves[i];
+
+        for(int j = 0; j < v->tunnel_count; ++j)
+        {
+            char tunnel_name[3] = {0};
+            memcpy(tunnel_name,v->tunnel_str+(3*j),2*sizeof(char));
+
+            for(int k = 0; k < valve_count; ++k)
+            {
+                if(strcmp(tunnel_name,&valves[k].name) == 0)
+                {
+                    v->tunnels[j] = &valves[k];
+                }
+            }
+        }
+    }
+
+    // part 1
+    // simulate
+
+    int seed = 17741581;
+    int max_total_released_pressure = 0;
+    int winning_seed;
+    int debug = 1;
+
+    const int num_loops = 1;
+
+    for(int i = 0; i < num_loops; ++i)
+    {
+        srand(seed);
+
+        Valve* curr_valve = &valves[0];
+
+        int m = 30;
+        int total_released_pressure = 0;
+
+        // open all valves again
+        for(int j = 0; j < valve_count; ++j)
+        {
+            valves[j].open = false;
+        }
+
+        for(;;)
+        {
+            if(m <= 0)
+                break;
+
+            if(curr_valve->flow_rate > 0 && !curr_valve->open)
+            {
+                int open = rand() % 6;
+                if(open > 1)
+                {
+                    if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m,curr_valve->name,curr_valve->flow_rate);
+                    // open valve
+                    curr_valve->open = true;
+                    total_released_pressure += (curr_valve->flow_rate*(m-1));
+                    --m;
+                }
+            }
+
+            // pick a tunnel to move to
+            int tunnel = rand() % (curr_valve->tunnel_count);
+            curr_valve = curr_valve->tunnels[tunnel];
+            if(debug) printf("[%d min left] Move to %s\n",m,curr_valve->name);
+            --m;
+        }
+
+        if(debug) printf("total pressure for seed: %d, is %d\n",seed, total_released_pressure);
+
+        if(total_released_pressure > max_total_released_pressure)
+        {
+            max_total_released_pressure = total_released_pressure;
+            winning_seed = seed;
+        }
+
+        seed++;
+
+    }
+
+    printf("Total Released Pressure: %d (seed=%d)\n",max_total_released_pressure,winning_seed);
 }
 
 int main(int argc, char* args[])
@@ -2372,7 +2536,8 @@ int main(int argc, char* args[])
     day12(1); // looking at test file due to substantial runtime
     day13();
     day14(1); // looking at test file due to substantial runtime
-    day15();
+    //day15(); // runtime
+    day16();
 
     printf("\n======================================================\n");
     return 0;
