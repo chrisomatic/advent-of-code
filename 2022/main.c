@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <math.h>
+#include <time.h>
 #include <sys/time.h>
 
 #include "common/util.h"
@@ -2192,11 +2193,13 @@ int manhatten_dist(int x1, int y1, int x2, int y2)
     return (ABS(x2 - x1) + ABS(y2 - y1));
 }
 
-void day15()
+void day15(bool test)
 {
     util_print_day(15);
 
-    char* input_file = "inputs/15.txt";
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/15_test.txt" : "inputs/15.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -2290,8 +2293,22 @@ void day15()
     // part 1
     // scan y=10 for a decent range of x
     int num_cannot_contain_beacon = 0;
-    int y = 2000000;
-    for(int x = -10000000; x <= 10000000; ++x)
+    int y;
+    int x_min1, x_max1;
+
+    if(test)
+    {
+        y = 20;
+        x_min1 = -100;
+        x_max1 = 100;
+    }
+    else
+    {
+        y = 2000000;
+        x_min1 = -10000000;
+        x_max1 = 10000000;
+    }
+    for(int x = x_min1; x <= x_max1; ++x)
     {
         for(int i = 0; i < num_readings; ++i)
         {
@@ -2330,13 +2347,31 @@ void day15()
     }
     */
 
-    // this range looked promising after plotting the sensors areas
-    // So focusing on it
 
     long tuning_freq = 0;
-    for(int x = 2550000; x <= 2580000; ++x)
+    int x_min2,x_max2;
+    int y_min2,y_max2;
+
+    if(test)
     {
-        for(int y = 3250000; y <= 3280000; ++y)
+        x_min2 = 0; x_max2 = 20;
+        y_min2 = 0; y_max2 = 20;
+    }
+    else
+    {
+        // this range looked promising after plotting the sensors areas
+        // So focusing on it
+        // I think a programatic solution would involve finding all intesections
+        // between line segments of beacon perimeters, and then searching a small
+        // range around each intersection found
+
+        x_min2 = 2550000; x_max2 = 2580000;
+        y_min2 = 3250000; y_max2 = 3280000;
+    }
+
+    for(int x = x_min2; x <= x_max2; ++x)
+    {
+        for(int y = y_min2; y <= y_max2; ++y)
         {
             bool possible_beacon = true;
 
@@ -2378,7 +2413,79 @@ struct Valve
     int tunnel_count;
     struct Valve* tunnels[8];
     bool open;
+    bool sim_open; // for projected simulation
 };
+
+int evaluate_valve_route(Valve* v, int* total_flow_rate, int* minutes_left, int* depth, const int max_depth, bool open_the_valve, bool* should_open)
+{
+    //printf("->%s",v->name);
+    if(!v->sim_open && open_the_valve)
+    {
+        //printf("(open)");
+        (*total_flow_rate) += (v->flow_rate * ((*minutes_left)-1));
+        v->sim_open = true;
+        (*minutes_left)--;
+    }
+
+    (*depth)++;
+    if(*depth >= max_depth || *minutes_left <= 0)
+    {
+        //printf("  Hit depth. Total flow rate: %d\n",*total_flow_rate);
+        return 0; // discarded
+    }
+
+    // dive into each tunnel
+    int winning_tunnel = 0;
+    int max_flow_rate = 0;
+
+    for(int i = 0; i < v->tunnel_count; ++i)
+    {
+        if(*depth == 1) printf("Testing valve %d (%s, flow_rate: %d)\n",i,v->tunnels[i]->name, v->tunnels[i]->flow_rate);
+
+        int test_rate1 = *total_flow_rate;
+        int test_depth1 = *depth;
+        int test_minutes_left1 = (*minutes_left) - 1;
+
+        evaluate_valve_route(v->tunnels[i],&test_rate1,&test_minutes_left1, &test_depth1, max_depth,false,NULL); // test not opening the valve
+
+        if(test_rate1 > max_flow_rate)
+        {
+            max_flow_rate = test_rate1;
+            winning_tunnel = i;
+        }
+
+        int test_rate2 = *total_flow_rate;
+        if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
+        {
+            int test_depth2 = *depth;
+            int test_minutes_left2 = (*minutes_left) - 1;
+
+            evaluate_valve_route(v->tunnels[i],&test_rate2,&test_minutes_left2, &test_depth2, max_depth,true,NULL); // test opening the valve
+
+            if(test_rate2 > max_flow_rate)
+            {
+                max_flow_rate = test_rate2;
+                winning_tunnel = i;
+
+                if(should_open)
+                    *should_open = true;
+            }
+        }
+
+        if(v->tunnels[i]->sim_open != v->tunnels[i]->open)
+            v->tunnels[i]->sim_open = v->tunnels[i]->open; // reset the simulated open state
+
+        if(*depth == 1) printf("Rate (closed): %d, Rate (open): %d\n",test_rate1,test_rate2);
+        if(*depth == 1) util_wait_until_key_press();
+
+    }
+
+    *total_flow_rate = max_flow_rate; // set total flow rate to max of children tunnels
+
+    //if(*depth == 1) printf("Winning tunnel: %d\n",winning_tunnel);
+
+    return winning_tunnel;
+}
 
 void day16()
 {
@@ -2445,7 +2552,7 @@ void day16()
 
             for(int k = 0; k < valve_count; ++k)
             {
-                if(strcmp(tunnel_name,&valves[k].name) == 0)
+                if(strcmp(tunnel_name,valves[k].name) == 0)
                 {
                     v->tunnels[j] = &valves[k];
                 }
@@ -2456,16 +2563,15 @@ void day16()
     // part 1
     // simulate
 
-    int seed = 17741581;
     int max_total_released_pressure = 0;
-    int winning_seed;
     int debug = 1;
+    int seed = 1000;
 
     const int num_loops = 1;
 
     for(int i = 0; i < num_loops; ++i)
     {
-        srand(seed);
+        srand(seed++);
 
         Valve* curr_valve = &valves[0];
 
@@ -2476,46 +2582,66 @@ void day16()
         for(int j = 0; j < valve_count; ++j)
         {
             valves[j].open = false;
+            valves[j].sim_open = false;
         }
+
+        bool open_valve = false;
 
         for(;;)
         {
             if(m <= 0)
                 break;
 
-            if(curr_valve->flow_rate > 0 && !curr_valve->open)
+            bool all_valves_open = true;
+            for(int j = 0; j < valve_count; ++j)
             {
-                int open = rand() % 6;
-                if(open > 1)
+                if(!valves[j].open && valves[j].flow_rate > 0)
                 {
-                    if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m,curr_valve->name,curr_valve->flow_rate);
-                    // open valve
-                    curr_valve->open = true;
-                    total_released_pressure += (curr_valve->flow_rate*(m-1));
-                    --m;
+                    all_valves_open = false;
+                    break;
                 }
             }
 
+            if(all_valves_open)
+            {
+                if(debug)printf("[%d min left] All valves open. Waiting...\n",m);
+                --m;
+                continue;
+            }
+
+            if(curr_valve->flow_rate > 0 && !curr_valve->open && open_valve)
+            {
+                // open valve
+                if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m,curr_valve->name,curr_valve->flow_rate);
+
+                curr_valve->open = true;
+                total_released_pressure += (curr_valve->flow_rate*(m-1));
+                --m;
+            }
+            
             // pick a tunnel to move to
-            int tunnel = rand() % (curr_valve->tunnel_count);
-            curr_valve = curr_valve->tunnels[tunnel];
+            int projected_flow_rate1 = 0;
+            int initial_depth = 0;
+            int minutes_left = m;
+
+            open_valve = false;
+            int chosen_tunnel = evaluate_valve_route(curr_valve, &projected_flow_rate1, &minutes_left, &initial_depth, 10,open_valve,&open_valve); // don't open valve
+
+            //int tunnel = rand() % (curr_valve->tunnel_count);
+            curr_valve = curr_valve->tunnels[chosen_tunnel];
             if(debug) printf("[%d min left] Move to %s\n",m,curr_valve->name);
             --m;
         }
 
-        if(debug) printf("total pressure for seed: %d, is %d\n",seed, total_released_pressure);
+        if(debug) printf("total pressure: %d\n", total_released_pressure);
 
         if(total_released_pressure > max_total_released_pressure)
         {
             max_total_released_pressure = total_released_pressure;
-            winning_seed = seed;
         }
-
-        seed++;
-
     }
 
-    printf("Total Released Pressure: %d (seed=%d)\n",max_total_released_pressure,winning_seed);
+    printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
 int main(int argc, char* args[])
@@ -2536,7 +2662,7 @@ int main(int argc, char* args[])
     day12(1); // looking at test file due to substantial runtime
     day13();
     day14(1); // looking at test file due to substantial runtime
-    //day15(); // runtime
+    day15(1); // looking at test file due to substantial runtime
     day16();
 
     printf("\n======================================================\n");

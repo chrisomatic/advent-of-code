@@ -134,6 +134,21 @@ int util_get_prime_factors(int num, int* factors, int factors_len)
     return fi;
 }
 
+int util_get_max(int* values, int len, int* max_index)
+{
+    int max = 0;
+    for(int i = 0; i < len; ++i)
+    {
+        if(values[i] > max)
+        {
+            max = values[i];
+            *max_index = i;
+        }
+    }
+
+    return max;
+}
+
 void util_wait_until_key_press()
 {
     getchar();
