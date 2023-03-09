@@ -159,6 +159,16 @@ int util_get_index_of_value(int value, int* values, int size)
     return -1;
 }
 
+int util_get_index_of_value_long(long value, long* values, int size)
+{
+    for(int i = 0; i < size; ++i)
+    {
+        if(values[i] == value)
+            return i;
+    }
+    return -1;
+}
+
 void util_wait_until_key_press()
 {
     getchar();

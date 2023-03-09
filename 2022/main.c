@@ -2874,19 +2874,19 @@ void day18(bool test)
 
 typedef struct
 {
-    int static_items[5000];
-    int items[5000];
-    int mapping[5000];
+    long static_items[5000];
+    long items[5000];
+    long mapping[5000];
     int count;
 } CircArray;
 
-void circ_array_shift_item(CircArray* array, int index, int amount)
+void circ_array_shift_item(CircArray* array, int index, long amount)
 {
-    printf("Moving index %d by %d\n",index,amount);
+    //printf("Moving index %d by %ld\n",index,amount);
 
     if(amount < 0)
     {
-        for(int i = amount; i < 0; ++i)
+        for(long i = amount; i < 0; ++i)
         {
             int swap_index = (index - 1);
             bool shift = false;
@@ -2895,8 +2895,8 @@ void circ_array_shift_item(CircArray* array, int index, int amount)
                 shift = true;
             }
             
-            int swap = array->items[index];
-            int map_swap = array->mapping[index];
+            long swap = array->items[index];
+            long map_swap = array->mapping[index];
 
             if(shift)
             {
@@ -2923,7 +2923,7 @@ void circ_array_shift_item(CircArray* array, int index, int amount)
     }
     else
     {
-        for(int i = 0; i < amount; ++i)
+        for(long i = 0; i < amount; ++i)
         {
             int swap_index = (index + 1);
 
@@ -2933,8 +2933,8 @@ void circ_array_shift_item(CircArray* array, int index, int amount)
                 shift = true;
             }
 
-            int swap = array->items[index];
-            int map_swap = array->mapping[index];
+            long swap = array->items[index];
+            long map_swap = array->mapping[index];
 
             if(shift)
             {
@@ -2965,12 +2965,12 @@ void circ_array_print(CircArray* array)
 {
     for(int i = 0; i < array->count; ++i)
     {
-        printf("%d ", array->items[i]);
+        printf("%ld ", array->items[i]);
     }
     printf("[ ");
     for(int i = 0; i < array->count; ++i)
     {
-        printf("%d ", array->mapping[i]);
+        printf("%ld ", array->mapping[i]);
     }
     printf("]\n");
 }
@@ -3007,13 +3007,13 @@ void day20(bool test)
         number_list.count++;
     }
 
-    circ_array_print(&number_list);
+    //circ_array_print(&number_list);
     
     // mix
     for(int i = 0; i < number_list.count; ++i)
     {
-        int map_index = util_get_index_of_value(i,number_list.mapping,number_list.count);
-        circ_array_shift_item(&number_list, map_index, number_list.static_items[i]);
+        int map_index = util_get_index_of_value_long(i,number_list.mapping,number_list.count);
+        circ_array_shift_item(&number_list, map_index, number_list.static_items[i] % (number_list.count-1));
         //circ_array_print(&number_list);
     }
 
@@ -3028,13 +3028,61 @@ void day20(bool test)
         }
     }
 
-    int x = number_list.items[(index_of_zero+1000) % number_list.count];
-    int y = number_list.items[(index_of_zero+2000) % number_list.count];
-    int z = number_list.items[(index_of_zero+3000) % number_list.count];
+    long x = number_list.items[(index_of_zero+1000) % number_list.count];
+    long y = number_list.items[(index_of_zero+2000) % number_list.count];
+    long z = number_list.items[(index_of_zero+3000) % number_list.count];
 
-    printf("x: %d, y: %d, z: %d\n",x,y,z);
+    //printf("x: %ld, y: %ld, z: %ld\n",x,y,z);
 
-    printf("1) Grove Coord Sum: %d",x+y+z);
+    printf("1) Grove Coord Sum: %ld\n",x+y+z);
+
+    // part 2
+
+    const int decryption_key = 811589153; 
+
+    // set up 
+    for(int i = 0; i < number_list.count; ++i)
+    {
+        number_list.static_items[i] = (long)(number_list.static_items[i] * decryption_key);
+        number_list.items[i] = number_list.static_items[i];
+        number_list.mapping[i] = i;
+    }
+
+    //circ_array_print(&number_list);
+
+    // 10 rounds
+    for(int r = 0; r < 10; ++r)
+    {
+        // mix
+        for(int i = 0; i < number_list.count; ++i)
+        {
+            int map_index = util_get_index_of_value_long(i,number_list.mapping,number_list.count);
+            circ_array_shift_item(&number_list, map_index, number_list.static_items[i] % (number_list.count-1));
+            //circ_array_print(&number_list);
+        }
+
+        //circ_array_print(&number_list);
+    }
+    
+    // find 0
+    index_of_zero = 0;
+    for(int i = 0; i < number_list.count; ++i)
+    {
+        if(number_list.items[i] == 0)
+        {
+            index_of_zero = i;
+            break;
+        }
+    }
+
+    x = number_list.items[(index_of_zero+1000) % number_list.count];
+    y = number_list.items[(index_of_zero+2000) % number_list.count];
+    z = number_list.items[(index_of_zero+3000) % number_list.count];
+
+    //printf("x: %ld, y: %ld, z: %ld\n",x,y,z);
+
+    printf("2) Grove Coord Sum: %ld\n",x+y+z);
+
 }
 
 int main(int argc, char* args[])
@@ -3058,7 +3106,7 @@ int main(int argc, char* args[])
     day15(1); // looking at test file due to substantial runtime
     //day16();
     day18(1);
-    day20(0);
+    day20(1); // looking at test file due to substantial runtime
 
     printf("\n======================================================\n");
     return 0;

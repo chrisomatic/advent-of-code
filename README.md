@@ -25,7 +25,7 @@ https://adventofcode.com/
 | 17 - Pyroclastic Flow | | |
 | 18 - Boiling Boulders | :star: | :star: |
 | 19 - Not Enough Materials | | |
-| 20 - Grove Positioning System | :star: | |
+| 20 - Grove Positioning System | :star: | :star: |
 | 21 - Monkey Math | | |
 | 22 - Monkey Map | | |
 | 23 - Unstable Diffusion | | |
