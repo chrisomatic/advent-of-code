@@ -2644,6 +2644,53 @@ void day16()
     printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
+void day17()
+{
+    util_print_day(17);
+
+    char* input_file = "inputs/17_test.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    char air_flow[1000] = {0};
+    int air_flow_count = 0;
+
+    for(;;)
+    {
+        int c = fgetc(fp);
+        if(c == EOF)
+            break;
+
+        air_flow[air_flow_count++] = c;
+    }
+
+    const char* shapes[5] = {
+        "####", // -
+        ".#.\n###\n.#.", //+
+        "..#\n..#\n###", // L
+        "#\n#\n#\n#", // |
+        "##\n##" // square
+    };
+    
+    for(int i = 0; i < 5; ++i)
+    {
+        printf("%s\n",shapes[i]);
+    }
+
+    for(int i = 0; i < air_flow_count; ++i)
+    {
+        printf("%c",air_flow[i]);
+    }
+
+    printf("\n");
+
+}
+
 typedef struct
 {
     int x,y,z;
@@ -3105,8 +3152,9 @@ int main(int argc, char* args[])
     day14(1); // looking at test file due to substantial runtime
     day15(1); // looking at test file due to substantial runtime
     //day16();
-    day18(1);
-    day20(1); // looking at test file due to substantial runtime
+    day17();
+    //day18(1);
+    //day20(1); // looking at test file due to substantial runtime
 
     printf("\n======================================================\n");
     return 0;
