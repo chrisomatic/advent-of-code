@@ -149,6 +149,16 @@ int util_get_max(int* values, int len, int* max_index)
     return max;
 }
 
+int util_get_index_of_value(int value, int* values, int size)
+{
+    for(int i = 0; i < size; ++i)
+    {
+        if(values[i] == value)
+            return i;
+    }
+    return -1;
+}
+
 void util_wait_until_key_press()
 {
     getchar();

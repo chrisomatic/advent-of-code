@@ -2644,6 +2644,399 @@ void day16()
     printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
+typedef struct
+{
+    int x,y,z;
+} Vec3i;
+
+typedef struct
+{
+    Vec3i points[10000];
+    int point_count;
+} Vec3iStack;
+
+void vec3i_enqueue(Vec3iStack* q, int x, int y, int z)
+{
+    q->points[q->point_count].x = x;
+    q->points[q->point_count].y = y;
+    q->points[q->point_count].z = z;
+    q->point_count++;
+}
+
+void vec3i_dequeue(Vec3iStack* q, int* x, int* y, int* z)
+{
+    *x = q->points[q->point_count-1].x;
+    *y = q->points[q->point_count-1].y;
+    *z = q->points[q->point_count-1].z;
+
+    q->point_count--;
+}
+
+bool vec3i_empty(Vec3iStack* q)
+{
+    return (q->point_count == 0);
+}
+
+int is_point_in_list(int x, int y, int z, Vec3i* points,int point_count)
+{
+    for(int i = 0; i < point_count; ++i)
+    {
+        Vec3i* point = &points[i];
+
+        if(x == point->x && y == point->y && z == point->z)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+bool is_point_trapped(int x, int y, int z, Vec3i* points, int point_count)
+{
+    if(is_point_in_list(x,y,z,points,point_count)) // already on points list
+        return false;
+
+    Vec3iStack q = {0};
+
+    Vec3i visited_list[10000] = {0};
+    int visited_list_count = 0;
+
+    Vec3i curr = {x,y,z};
+    vec3i_enqueue(&q,curr.x,curr.y,curr.z);
+
+    bool debug = false;//(x == 6 && y == 12 && z == 14);
+
+    while(!vec3i_empty(&q))
+    {
+        vec3i_dequeue(&q,&curr.x,&curr.y,&curr.z);
+
+        if(debug) printf("Stack Size: %d, Checking %d, %d, %d\n",q.point_count, curr.x,curr.y,curr.z);
+
+        // check if point is outside range of lava droplet
+        if(curr.x < 0 || curr.y < 0 || curr.z < 0)
+            return false;
+
+        if(curr.x > 19 || curr.y > 19 || curr.z > 19)
+            return false;
+
+        if(is_point_in_list(curr.x,curr.y,curr.z,visited_list,visited_list_count)) // already visited
+        {
+            if(debug) printf("Already visited. continuing...\n");
+            continue;
+        }
+
+        // copy in already visited
+        memcpy(&visited_list[visited_list_count++],&curr,sizeof(Vec3i));
+
+        if(is_point_in_list(curr.x,curr.y,curr.z,points,point_count))
+        {
+            if(debug) printf("Hit lava material\n");
+            continue; // hit lava material or already trapped air
+        }
+
+        // point is unexplored air
+        vec3i_enqueue(&q,curr.x+1,curr.y+0,curr.z+0);
+        vec3i_enqueue(&q,curr.x-1,curr.y+0,curr.z+0);
+        vec3i_enqueue(&q,curr.x+0,curr.y+1,curr.z+0);
+        vec3i_enqueue(&q,curr.x+0,curr.y-1,curr.z+0);
+        vec3i_enqueue(&q,curr.x+0,curr.y+0,curr.z+1);
+        vec3i_enqueue(&q,curr.x+0,curr.y+0,curr.z-1);
+    }
+
+    return true;
+}
+
+void day18(bool test)
+{
+    util_print_day(18);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/18_test.txt" : "inputs/18.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    Valve valves[50] = {0};
+    int valve_count = 0;
+
+    char line[100+1] = {0};
+
+    Vec3i points[10000] = {0};
+    int point_count = 0;
+
+    for(;;)
+    {
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        Vec3i* v = &points[point_count];
+        int num_matches = sscanf(line, "%d,%d,%d\n",&v->x,&v->y,&v->z);
+        point_count++;
+    }
+
+    // part 1
+    // find all exposed sides
+
+    int total_sides_exposed = 0;
+    Vec3i dimensions = {0};
+
+    for(int i = 0; i < point_count; ++i)
+    {
+        Vec3i* p = &points[i];
+        
+        int u = is_point_in_list(p->x, p->y-1, p->z, points,point_count);
+        int d = is_point_in_list(p->x, p->y+1, p->z, points,point_count);
+        int l = is_point_in_list(p->x-1, p->y, p->z, points,point_count);
+        int r = is_point_in_list(p->x+1, p->y, p->z, points,point_count);
+        int f = is_point_in_list(p->x, p->y, p->z-1, points,point_count);
+        int b = is_point_in_list(p->x, p->y, p->z+1, points,point_count);
+
+        int exposed_sides = 6 - u - d - l - r - f - b;
+        
+        //printf("Cube %d (%d,%d,%d) has %d sides exposed\n",i,p->x,p->y,p->z,exposed_sides);
+
+        total_sides_exposed += exposed_sides;
+
+        if(p->x > dimensions.x)
+            dimensions.x = p->x;
+        if(p->y > dimensions.y)
+            dimensions.y = p->y;
+        if(p->z > dimensions.z)
+            dimensions.z = p->z;
+
+    }
+
+    printf("1) Total surface area: %d\n",total_sides_exposed);
+
+    // part 2
+    // Get only exterior faces trapped air cubes
+
+    int air_count = 0;
+
+    //printf("dimensions: %d %d %d\n",dimensions.x,dimensions.y,dimensions.z);
+
+    for(int i = 0; i < dimensions.x; ++i)
+    {
+        for(int j = 0; j < dimensions.y; ++j)
+        {
+            for(int k = 0; k < dimensions.z; ++k)
+            {
+                bool trapped = is_point_trapped(i,j,k, points, point_count);
+
+                //util_wait_until_key_press();
+
+                if(trapped)
+                {
+                    // trapped air
+                    // add to list
+                    points[point_count].x = i;
+                    points[point_count].y = j;
+                    points[point_count].z = k;
+                    point_count++;
+                    air_count++;
+                    //printf("Trapped air! (%d, %d, %d)\n",i,j,k);
+                }
+            }
+        }
+    }
+
+    //printf("Trapped air count: %d\n",air_count);
+
+    int total_sides_exposed2 = 0;
+
+    for(int i = 0; i < point_count; ++i)
+    {
+        Vec3i* p = &points[i];
+        
+        int u = is_point_in_list(p->x, p->y-1, p->z, points,point_count);
+        int d = is_point_in_list(p->x, p->y+1, p->z, points,point_count);
+        int l = is_point_in_list(p->x-1, p->y, p->z, points,point_count);
+        int r = is_point_in_list(p->x+1, p->y, p->z, points,point_count);
+        int f = is_point_in_list(p->x, p->y, p->z-1, points,point_count);
+        int b = is_point_in_list(p->x, p->y, p->z+1, points,point_count);
+
+        int exposed_sides = 6 - u - d - l - r - f - b;
+        
+        //printf("Cube %d (%d,%d,%d) has %d sides exposed\n",i,p->x,p->y,p->z,exposed_sides);
+
+        total_sides_exposed2 += exposed_sides;
+
+    }
+
+    printf("2) Total surface area: %d\n",total_sides_exposed2);
+
+}
+
+typedef struct
+{
+    int static_items[5000];
+    int items[5000];
+    int mapping[5000];
+    int count;
+} CircArray;
+
+void circ_array_shift_item(CircArray* array, int index, int amount)
+{
+    printf("Moving index %d by %d\n",index,amount);
+
+    if(amount < 0)
+    {
+        for(int i = amount; i < 0; ++i)
+        {
+            int swap_index = (index - 1);
+            bool shift = false;
+            if(swap_index < 0) {
+                swap_index = array->count-2;
+                shift = true;
+            }
+            
+            int swap = array->items[index];
+            int map_swap = array->mapping[index];
+
+            if(shift)
+            {
+                for(int j = 1; j < array->count; ++j)
+                {
+                    array->items[j-1] = array->items[j];
+                    array->mapping[j-1] = array->mapping[j];
+                }
+            }
+
+            if(!shift) {
+                array->items[index] = array->items[swap_index];
+                array->mapping[index] = array->mapping[swap_index];
+            }
+
+            array->items[swap_index] = swap;
+            array->mapping[swap_index] = map_swap;
+
+            //printf("  ");
+            //circ_array_print(array);
+
+            index = swap_index;
+        }
+    }
+    else
+    {
+        for(int i = 0; i < amount; ++i)
+        {
+            int swap_index = (index + 1);
+
+            bool shift = false;
+            if(swap_index >= array->count) {
+                swap_index = 1;
+                shift = true;
+            }
+
+            int swap = array->items[index];
+            int map_swap = array->mapping[index];
+
+            if(shift)
+            {
+                for(int j = array->count-1; j > 0; --j)
+                {
+                    array->items[j] = array->items[j-1];
+                    array->mapping[j] = array->mapping[j-1];
+                }
+            }
+
+            if(!shift) {
+                array->items[index] = array->items[swap_index];
+                array->mapping[index] = array->mapping[swap_index];
+            }
+
+            array->items[swap_index] = swap;
+            array->mapping[swap_index] = map_swap;
+
+            //printf("  ");
+            //circ_array_print(array);
+
+            index = swap_index;
+        }
+    }
+}
+
+void circ_array_print(CircArray* array)
+{
+    for(int i = 0; i < array->count; ++i)
+    {
+        printf("%d ", array->items[i]);
+    }
+    printf("[ ");
+    for(int i = 0; i < array->count; ++i)
+    {
+        printf("%d ", array->mapping[i]);
+    }
+    printf("]\n");
+}
+
+void day20(bool test)
+{
+    util_print_day(20);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/20_test.txt" : "inputs/20.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    CircArray number_list = {0};
+
+    char line[20+1] = {0};
+
+    for(;;)
+    {
+        if(fgets(line,20,fp) == NULL)
+            break;
+
+        int n = atoi(line);
+
+        number_list.items[number_list.count] = n;
+        number_list.static_items[number_list.count] = n;
+        number_list.mapping[number_list.count] = number_list.count;
+        number_list.count++;
+    }
+
+    circ_array_print(&number_list);
+    
+    // mix
+    for(int i = 0; i < number_list.count; ++i)
+    {
+        int map_index = util_get_index_of_value(i,number_list.mapping,number_list.count);
+        circ_array_shift_item(&number_list, map_index, number_list.static_items[i]);
+        //circ_array_print(&number_list);
+    }
+
+    // find 0
+    int index_of_zero = 0;
+    for(int i = 0; i < number_list.count; ++i)
+    {
+        if(number_list.items[i] == 0)
+        {
+            index_of_zero = i;
+            break;
+        }
+    }
+
+    int x = number_list.items[(index_of_zero+1000) % number_list.count];
+    int y = number_list.items[(index_of_zero+2000) % number_list.count];
+    int z = number_list.items[(index_of_zero+3000) % number_list.count];
+
+    printf("x: %d, y: %d, z: %d\n",x,y,z);
+
+    printf("1) Grove Coord Sum: %d",x+y+z);
+}
+
 int main(int argc, char* args[])
 {
     printf("\n===================== AOC 2022 =======================\n");
@@ -2663,7 +3056,9 @@ int main(int argc, char* args[])
     day13();
     day14(1); // looking at test file due to substantial runtime
     day15(1); // looking at test file due to substantial runtime
-    day16();
+    //day16();
+    day18(1);
+    day20(0);
 
     printf("\n======================================================\n");
     return 0;

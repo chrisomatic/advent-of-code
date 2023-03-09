@@ -20,14 +20,14 @@ https://adventofcode.com/
 | 12 - Hill Climbing Algorithm | :star: | :star: |
 | 13 - Distress Signal | :star: | :star: |
 | 14 - Regolith Reservoir | :star: | :star: |
-| 15 | | |
-| 16 | | |
-| 17 | | |
-| 18 | | |
-| 19 | | |
-| 20 | | |
-| 21 | | |
-| 22 | | |
-| 23 | | |
-| 24 | | |
-| 25 | | |
+| 15 - Beacon Exclusion Zone | :star: | :star: |
+| 16 - Proboscidea Volcanium | | |
+| 17 - Pyroclastic Flow | | |
+| 18 - Boiling Boulders | :star: | :star: |
+| 19 - Not Enough Materials | | |
+| 20 - Grove Positioning System | :star: | |
+| 21 - Monkey Math | | |
+| 22 - Monkey Map | | |
+| 23 - Unstable Diffusion | | |
+| 24 - Blizzard Basin | | |
+| 25 - Full of Hot Air | | |
