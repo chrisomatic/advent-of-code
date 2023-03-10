@@ -2644,9 +2644,17 @@ void day16()
     printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
-void draw_board(char board[100][7], int max_height, const int board_width)
+#define BOARD_MAX_HEIGHT 10000
+
+typedef struct
 {
-    for(int y = max_height + 4; y >= 0; --y)
+    const char* data;
+    int x,y;
+} Shape;
+
+void draw_board(char board[BOARD_MAX_HEIGHT][7], int max_height, const int board_width)
+{
+    for(int y = max_height + 3 + 4; y >= 0; --y)
     {
         if(y == 0) printf("+"); else printf("|"); // wall/floor
 
@@ -2659,20 +2667,67 @@ void draw_board(char board[100][7], int max_height, const int board_width)
         }
         if(y == 0) printf("+"); else printf("|\n"); // wall/floor
     }
-    printf("\n");
+    printf(" max_height: %d\n",max_height);
 }
 
-typedef struct
+bool sim_shape_on_board(char board[BOARD_MAX_HEIGHT][7], Shape* s, bool draw)
 {
-    const char* data;
-    int x,y;
-} Shape;
+    int draw_x = s->x;
+    int draw_y = s->y;
+
+    bool collision = false;
+
+    for(int i = 0; i < strlen(s->data); ++i)
+    {
+        char c = s->data[i];
+
+        if(c == '\n')
+        {
+            draw_y--;
+            draw_x = s->x;
+            continue;
+        }
+
+        if(c == '#')
+        {
+            if(board[draw_y][draw_x] == '#')
+            {
+                // collision
+                collision = true;
+            }
+
+            if(draw)
+            {
+                board[draw_y][draw_x] = c;
+            }
+        }
+
+        draw_x++;
+    }
+
+    return collision;
+
+}
+
+bool get_highest_tetris(char board[BOARD_MAX_HEIGHT][7], int max_height, int* line)
+{
+    for(int i = max_height; i >= 1; --i)
+    {
+        if(board[i][0] == '#' && board[i][1] == '#' && board[i][2] == '#' &&
+           board[i][3] == '#' && board[i][4] == '#' && board[i][5] == '#' && board[i][6] == '#')
+        {
+            *line = i;
+            return true;
+        }
+    }
+    return false;
+}
 
 void day17()
 {
     util_print_day(17);
 
-    char* input_file = "inputs/17_test.txt";
+    char* input_file = "inputs/17.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -2681,16 +2736,18 @@ void day17()
         return;
     }
 
-    char air_flow[1000] = {0};
+    char air_flow[20000] = {0};
     int air_flow_count = 0;
 
+    // parse input file
     for(;;)
     {
         int c = fgetc(fp);
         if(c == EOF)
             break;
 
-        air_flow[air_flow_count++] = c;
+        if(c == '<' || c == '>')
+            air_flow[air_flow_count++] = c;
     }
 
     const char* shapes[5] = {
@@ -2701,71 +2758,98 @@ void day17()
         "##\n##" // square
     };
 
+    const PathPos shape_sizes[5] = {
+        {4,1}, // - 
+        {3,3}, // +
+        {3,3}, // L
+        {1,4}, // |
+        {2,2}  // square
+    };
+
     // initialize board
-    char base_board[100][7];
+    char base_board[BOARD_MAX_HEIGHT][7];
     memset(base_board,'.',sizeof(base_board));
     
     int max_height = 0;
+    int tetris_max_height = 0;
     const int board_width = 7;
     bool air_turn = true;
     int air_index = 0;
 
-    char board[100][7];
+    PathPos prior_move = {0,0};
 
-    for(int b = 0; b < 5; ++b)
+    char board[BOARD_MAX_HEIGHT][7];
+
+    const char debug = 0;
+
+    for(int b = 0; b < 1000*1000000; ++b)
     {
-        Shape curr_shape = {shapes[b],2,max_height+4};
+        if((b % 1000000) == 0)
+        {
+            printf("# Rocks: %d\n",b);
+        }
+
+        int shape_index = b % 5;
+        PathPos shape_size = shape_sizes[shape_index];
+        Shape curr_shape = {shapes[shape_index],2,max_height+3+shape_size.y};
 
         for(;;)
         {
             // clear current piece
             memcpy(board,base_board,sizeof(base_board));
 
-            // draw current piece on board
-            int draw_x = curr_shape.x;
-            int draw_y = curr_shape.y;
 
-            for(int i = 0; i < strlen(curr_shape.data); ++i)
+            // try piece on board
+            bool collision = sim_shape_on_board(board,&curr_shape, false);
+
+            if(collision)
             {
-                char c = curr_shape.data[i];
+                // resolve collision
+                if(debug) printf("Collision!\n");
 
-                if(c == '\n')
+                curr_shape.x -= prior_move.x;
+                curr_shape.y -= prior_move.y;
+
+                // draw piece
+                sim_shape_on_board(board,&curr_shape, true);
+
+                if(prior_move.y < 0)
                 {
-                    draw_y--;
-                    draw_x = curr_shape.x;
-                    continue;
+                    // final location
+                    break;
                 }
-
-                if(c == '#')
-                {
-                    board[draw_y][draw_x] = c;
-                }
-
-                draw_x++;
+            }
+            else
+            {
+                // draw piece
+                sim_shape_on_board(board,&curr_shape, true);
             }
 
             // draw board
-            draw_board(board,max_height, board_width);
+            if(debug) draw_board(board,max_height, board_width);
 
             // wait for frame
-            util_wait_until_key_press();
-
-            // checks
-            if(draw_y <= 1)
-            {
-                // hit floor
-                break;
-            }
+            if(debug) util_wait_until_key_press();
 
             // simulate
             if(air_turn)
             {
                 // push piece
-                int a = air_flow[air_index%air_flow_count];
-                if(a == '<' && draw_x >= 1)
+                char a = air_flow[air_index%air_flow_count];
+                if(debug) printf("%c (%d/%d)\n",a,air_index, air_flow_count);
+
+                prior_move.y = 0;
+
+                if(a == '<' && curr_shape.x > 0)
+                {
+                    prior_move.x = -1;
                     curr_shape.x--;
-                if(a == '>' && draw_x < board_width)
+                }
+                if(a == '>' && curr_shape.x + shape_size.x < board_width)
+                {
+                    prior_move.x = 1;
                     curr_shape.x++;
+                }
                 air_index++;
                 air_turn = false;
             }
@@ -2773,14 +2857,50 @@ void day17()
             {
                 // shape falls
                 curr_shape.y--;
+                prior_move.x = 0;
+                prior_move.y = -1;
                 air_turn = true;
+            }
+           
+            // checks
+            if(curr_shape.y - shape_size.y + 1 <= 0)
+            {
+                // hit floor
+                curr_shape.y++;
+                break;
             }
         }
 
         // solidify the last piece as part of the board
         memcpy(base_board,board,sizeof(board));
-        max_height = curr_shape.y;
+
+        if(curr_shape.y > max_height)
+            max_height = curr_shape.y;
+
+
+        int line;
+        bool tetris = get_highest_tetris(board, max_height, &line);
+
+        if(tetris)
+        {
+            int height = tetris_max_height + line;
+            if(height % (5*10091) == 0)
+            {
+                printf("TETRIS @ height %d!\n",tetris_max_height + line);
+                draw_board(board,max_height, board_width);
+            }
+            //util_wait_until_key_press();
+
+            // discard everything below tetris line
+            memcpy(base_board, &base_board[line][0],sizeof(char)*7*max_height-line);
+            memset(&base_board[max_height-line+1][0],'.',sizeof(char)*7*max_height);
+
+            tetris_max_height = tetris_max_height + line;
+            max_height -= line;
+        }
     }
+
+    printf("1) Max Height: %d\n", max_height+tetris_max_height);
     
 }
 
