@@ -2644,6 +2644,30 @@ void day16()
     printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
+void draw_board(char board[100][7], int max_height, const int board_width)
+{
+    for(int y = max_height + 4; y >= 0; --y)
+    {
+        if(y == 0) printf("+"); else printf("|"); // wall/floor
+
+        for(int x = 0; x < board_width; ++x)
+        {
+            if(y == 0)
+                printf("-");
+            else 
+                printf("%c", board[y][x]);
+        }
+        if(y == 0) printf("+"); else printf("|\n"); // wall/floor
+    }
+    printf("\n");
+}
+
+typedef struct
+{
+    const char* data;
+    int x,y;
+} Shape;
+
 void day17()
 {
     util_print_day(17);
@@ -2676,19 +2700,88 @@ void day17()
         "#\n#\n#\n#", // |
         "##\n##" // square
     };
+
+    // initialize board
+    char base_board[100][7];
+    memset(base_board,'.',sizeof(base_board));
     
-    for(int i = 0; i < 5; ++i)
+    int max_height = 0;
+    const int board_width = 7;
+    bool air_turn = true;
+    int air_index = 0;
+
+    char board[100][7];
+
+    for(int b = 0; b < 5; ++b)
     {
-        printf("%s\n",shapes[i]);
+        Shape curr_shape = {shapes[b],2,max_height+4};
+
+        for(;;)
+        {
+            // clear current piece
+            memcpy(board,base_board,sizeof(base_board));
+
+            // draw current piece on board
+            int draw_x = curr_shape.x;
+            int draw_y = curr_shape.y;
+
+            for(int i = 0; i < strlen(curr_shape.data); ++i)
+            {
+                char c = curr_shape.data[i];
+
+                if(c == '\n')
+                {
+                    draw_y--;
+                    draw_x = curr_shape.x;
+                    continue;
+                }
+
+                if(c == '#')
+                {
+                    board[draw_y][draw_x] = c;
+                }
+
+                draw_x++;
+            }
+
+            // draw board
+            draw_board(board,max_height, board_width);
+
+            // wait for frame
+            util_wait_until_key_press();
+
+            // checks
+            if(draw_y <= 1)
+            {
+                // hit floor
+                break;
+            }
+
+            // simulate
+            if(air_turn)
+            {
+                // push piece
+                int a = air_flow[air_index%air_flow_count];
+                if(a == '<' && draw_x >= 1)
+                    curr_shape.x--;
+                if(a == '>' && draw_x < board_width)
+                    curr_shape.x++;
+                air_index++;
+                air_turn = false;
+            }
+            else
+            {
+                // shape falls
+                curr_shape.y--;
+                air_turn = true;
+            }
+        }
+
+        // solidify the last piece as part of the board
+        memcpy(base_board,board,sizeof(board));
+        max_height = curr_shape.y;
     }
-
-    for(int i = 0; i < air_flow_count; ++i)
-    {
-        printf("%c",air_flow[i]);
-    }
-
-    printf("\n");
-
+    
 }
 
 typedef struct
