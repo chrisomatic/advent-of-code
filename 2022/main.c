@@ -2771,7 +2771,7 @@ void day17()
     memset(base_board,'.',sizeof(base_board));
     
     int max_height = 0;
-    int tetris_max_height = 0;
+    long tetris_max_height = 0;
     const int board_width = 7;
     bool air_turn = true;
     int air_index = 0;
@@ -2782,11 +2782,11 @@ void day17()
 
     const char debug = 0;
 
-    for(int b = 0; b < 1000*1000000; ++b)
+    for(long b = 0; b < 1000*1000000; ++b)
     {
         if((b % 1000000) == 0)
         {
-            printf("# Rocks: %d\n",b);
+            printf("# Rocks: %ld\n",b);
         }
 
         int shape_index = b % 5;
@@ -2883,11 +2883,21 @@ void day17()
 
         if(tetris)
         {
-            int height = tetris_max_height + line;
-            if(height % (5*10091) == 0)
+            long height = tetris_max_height + line;
+
+            if(line == max_height)
             {
-                printf("TETRIS @ height %d!\n",tetris_max_height + line);
-                draw_board(board,max_height, board_width);
+                printf("Full clear tetris! Height: %ld, Index: %ld, Shape %d\n", height, b,shape_index);
+            }
+
+            if(b % (5*10091) == 0) // checking for divisibility by airflow pattern and shape pattern
+            {
+                if(line == max_height)
+                {
+                    // tetris happened at very top, so complete reset of pattern!
+                    printf("Pattern Repeat @ height %ld (iteration: %ld)!\n",height, b);
+                    draw_board(board,max_height, board_width);
+                }
             }
             //util_wait_until_key_press();
 
@@ -2900,7 +2910,7 @@ void day17()
         }
     }
 
-    printf("1) Max Height: %d\n", max_height+tetris_max_height);
+    printf("1) Max Height: %ld\n", max_height+tetris_max_height);
     
 }
 
@@ -3130,6 +3140,126 @@ void day18(bool test)
 
     printf("2) Total surface area: %d\n",total_sides_exposed2);
 
+}
+
+typedef struct
+{
+    int cost_ore;
+    int cost_clay;
+    int cost_obsidian;
+} Robot;
+
+typedef struct
+{
+    int id;
+    Robot robot_ore;
+    Robot robot_clay;
+    Robot robot_obsidian;
+    Robot robot_geode;
+} Blueprint;
+
+void day19(bool test)
+{
+    util_print_day(19);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/19_test.txt" : "inputs/19.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    Blueprint blueprints[50] = {0};
+    int blueprint_count = 0;
+
+    for(;;)
+    {
+        Blueprint* bp = &blueprints[blueprint_count];
+
+        int num_matches = fscanf(fp, "Blueprint %d: Each ore robot costs %d ore. Each clay robot costs %d ore. Each obsidian robot costs %d ore and %d clay. Each geode robot costs %d ore and %d obsidian.\n",&bp->id, &bp->robot_ore.cost_ore, &bp->robot_clay.cost_ore, &bp->robot_obsidian.cost_ore, &bp->robot_obsidian.cost_clay, &bp->robot_geode.cost_ore, &bp->robot_geode.cost_obsidian);
+
+        if(num_matches <= 0)
+            break;
+
+        blueprint_count++;
+    }
+
+    printf("Num Blueprints: %d\n",blueprint_count);
+
+    for(int i = 0; i < blueprint_count; ++i)
+    {
+        Blueprint* bp = &blueprints[i];
+        printf("  ID: %d\n", bp->id);
+    }
+
+    srand(time(0));
+
+    Blueprint* bp = &blueprints[0];
+
+    // init
+    int count_ore = 0;
+    int count_clay = 0;
+    int count_obsidian = 0;
+    int count_geode = 0;
+
+    int count_ore_robot = 1;
+    int count_clay_robot = 0;
+    int count_obsidian_robot = 0;
+    int count_geode_robot = 0;
+
+    // simulate
+    int m = 24;
+
+    for(;;)
+    {
+        if(m <= 0)
+            break;
+
+        // mine resources
+        count_ore += count_ore_robot;
+        count_clay += count_clay_robot;
+        count_obsidian += count_obsidian_robot;
+        count_geode += count_geode_robot;
+
+        printf("[%d min] %d ore, %d clay, %d obsidian, %d geode [R: %d,%d,%d,%d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot);
+
+        // check robot costs
+        if(bp->robot_ore.cost_ore <= count_ore && count_ore_robot < bp->robot_clay.cost_ore)
+        {
+            count_ore -= bp->robot_ore.cost_ore;
+            count_ore_robot++;
+            --m;
+        }
+        if(bp->robot_clay.cost_ore <= count_ore && count_clay_robot < bp->robot_obsidian.cost_clay)
+        {
+            count_ore -= bp->robot_clay.cost_ore;
+            count_clay_robot++;
+            --m;
+        }
+        if(bp->robot_obsidian.cost_ore <= count_ore && bp->robot_obsidian.cost_clay <= count_clay)
+        {
+            count_ore  -= bp->robot_obsidian.cost_ore;
+            count_clay -= bp->robot_obsidian.cost_clay;
+            count_obsidian_robot++;
+            --m;
+        }
+        if(bp->robot_geode.cost_ore <= count_ore && bp->robot_geode.cost_obsidian <= count_obsidian)
+        {
+            count_ore  -= bp->robot_geode.cost_ore;
+            count_obsidian -= bp->robot_geode.cost_obsidian;
+            count_geode_robot++;
+            --m;
+        }
+
+        --m;
+    }
+        
+    printf("Geode count: %d\n",count_geode);
+    
 }
 
 typedef struct
@@ -3365,7 +3495,8 @@ int main(int argc, char* args[])
     day14(1); // looking at test file due to substantial runtime
     day15(1); // looking at test file due to substantial runtime
     //day16();
-    day17();
+    //day17();
+    day19(1);
     //day18(1);
     //day20(1); // looking at test file due to substantial runtime
 
