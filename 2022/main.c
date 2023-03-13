@@ -2644,7 +2644,7 @@ void day16()
     printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
-#define BOARD_MAX_HEIGHT 10000
+#define BOARD_MAX_HEIGHT 100000
 
 typedef struct
 {
@@ -2890,7 +2890,7 @@ void day17()
                 printf("Full clear tetris! Height: %ld, Index: %ld, Shape %d\n", height, b,shape_index);
             }
 
-            if(b % (5*10091) == 0) // checking for divisibility by airflow pattern and shape pattern
+            if((b+1) % (5*10091) == 0) // checking for divisibility by airflow pattern and shape pattern
             {
                 if(line == max_height)
                 {
@@ -3158,6 +3158,8 @@ typedef struct
     Robot robot_geode;
 } Blueprint;
 
+#define RAND_FLOAT(min, max) ((float)((double)rand()/(double)(RAND_MAX/((max)-(min))))+(min))
+
 void day19(bool test)
 {
     util_print_day(19);
@@ -3200,65 +3202,105 @@ void day19(bool test)
 
     Blueprint* bp = &blueprints[0];
 
-    // init
-    int count_ore = 0;
-    int count_clay = 0;
-    int count_obsidian = 0;
-    int count_geode = 0;
+    int total_required_ore = bp->robot_ore.cost_ore + bp->robot_clay.cost_ore + bp->robot_obsidian.cost_ore + bp->robot_geode.cost_ore;
 
-    int count_ore_robot = 1;
-    int count_clay_robot = 0;
-    int count_obsidian_robot = 0;
-    int count_geode_robot = 0;
+    int total_required_clay = bp->robot_ore.cost_clay + bp->robot_clay.cost_clay + bp->robot_obsidian.cost_clay + bp->robot_geode.cost_clay;
 
-    // simulate
-    int m = 24;
+    int total_required_obsidian = bp->robot_ore.cost_obsidian + bp->robot_clay.cost_obsidian + bp->robot_obsidian.cost_obsidian + bp->robot_geode.cost_obsidian;
 
-    for(;;)
+    int total_required = total_required_ore + total_required_clay + total_required_obsidian;
+
+    float pct_ore = total_required_ore / (float)total_required;
+    float pct_clay = total_required_clay / (float)total_required;
+    float pct_obsidian = total_required_obsidian / (float)total_required;
+
+    printf("percentages: %f, %f, %f\n", pct_ore, pct_clay, pct_obsidian);
+
+    int max_geode_count = 0;
+
+    for(int i = 0; i < 1000000; ++i)
     {
-        if(m <= 0)
-            break;
+        // init
+        int count_ore = 0;
+        int count_clay = 0;
+        int count_obsidian = 0;
+        int count_geode = 0;
 
-        // mine resources
-        count_ore += count_ore_robot;
-        count_clay += count_clay_robot;
-        count_obsidian += count_obsidian_robot;
-        count_geode += count_geode_robot;
+        int count_ore_robot = 1;
+        int count_clay_robot = 0;
+        int count_obsidian_robot = 0;
+        int count_geode_robot = 0;
 
-        printf("[%d min] %d ore, %d clay, %d obsidian, %d geode [R: %d,%d,%d,%d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot);
+        // simulate
+        int m = 24;
 
-        // check robot costs
-        if(bp->robot_ore.cost_ore <= count_ore && count_ore_robot < bp->robot_clay.cost_ore)
+        for(;;)
         {
-            count_ore -= bp->robot_ore.cost_ore;
-            count_ore_robot++;
+            if(m <= 0)
+                break;
+
+            // mine resources
+            count_ore += count_ore_robot;
+            count_clay += count_clay_robot;
+            count_obsidian += count_obsidian_robot;
+            count_geode += count_geode_robot;
+
+            //printf("[%d min] %d ore, %d clay, %d obsidian, %d geode [R: %d,%d,%d,%d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot);
+
+            // check robot costs
+            if(bp->robot_geode.cost_ore <= count_ore && bp->robot_geode.cost_obsidian <= count_obsidian)
+            {
+                // Geode Robot
+                count_ore  -= bp->robot_geode.cost_ore;
+                count_obsidian -= bp->robot_geode.cost_obsidian;
+                count_geode_robot++;
+                --m;
+            }
+            if(bp->robot_obsidian.cost_ore <= count_ore && bp->robot_obsidian.cost_clay <= count_clay)
+            {
+                float r = RAND_FLOAT(0.0,1.0);
+                if(r <= pct_obsidian)
+                {
+                    // Obsidian Robot
+                    count_ore  -= bp->robot_obsidian.cost_ore;
+                    count_clay -= bp->robot_obsidian.cost_clay;
+                    count_obsidian_robot++;
+                    --m;
+
+                }
+            }
+            if(bp->robot_clay.cost_ore <= count_ore && count_clay_robot < bp->robot_obsidian.cost_clay)
+            {
+                float r = RAND_FLOAT(0.0,1.0);
+                if(r <= pct_clay)
+                {
+                    // Clay Robot
+                    count_ore -= bp->robot_clay.cost_ore;
+                    count_clay_robot++;
+                    --m;
+                }
+            }
+            if(bp->robot_ore.cost_ore <= count_ore && count_ore_robot < bp->robot_clay.cost_ore)
+            {
+                float r = RAND_FLOAT(0.0,1.0);
+                if(r <= pct_ore)
+                {
+                    // Ore Robot
+                    count_ore -= bp->robot_ore.cost_ore;
+                    count_ore_robot++;
+                    --m;
+                }
+            }
+
             --m;
         }
-        if(bp->robot_clay.cost_ore <= count_ore && count_clay_robot < bp->robot_obsidian.cost_clay)
-        {
-            count_ore -= bp->robot_clay.cost_ore;
-            count_clay_robot++;
-            --m;
-        }
-        if(bp->robot_obsidian.cost_ore <= count_ore && bp->robot_obsidian.cost_clay <= count_clay)
-        {
-            count_ore  -= bp->robot_obsidian.cost_ore;
-            count_clay -= bp->robot_obsidian.cost_clay;
-            count_obsidian_robot++;
-            --m;
-        }
-        if(bp->robot_geode.cost_ore <= count_ore && bp->robot_geode.cost_obsidian <= count_obsidian)
-        {
-            count_ore  -= bp->robot_geode.cost_ore;
-            count_obsidian -= bp->robot_geode.cost_obsidian;
-            count_geode_robot++;
-            --m;
-        }
 
-        --m;
+        if(count_geode > max_geode_count)
+            max_geode_count = count_geode;
+
     }
         
-    printf("Geode count: %d\n",count_geode);
+    printf("Geode count: %d\n",max_geode_count);
     
 }
 
@@ -3496,8 +3538,8 @@ int main(int argc, char* args[])
     day15(1); // looking at test file due to substantial runtime
     //day16();
     //day17();
-    day19(1);
     //day18(1);
+    day19(1);
     //day20(1); // looking at test file due to substantial runtime
 
     printf("\n======================================================\n");
