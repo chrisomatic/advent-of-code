@@ -22,12 +22,12 @@ https://adventofcode.com/
 | 14 - Regolith Reservoir | :star: | :star: |
 | 15 - Beacon Exclusion Zone | :star: | :star: |
 | 16 - Proboscidea Volcanium | | |
-| 17 - Pyroclastic Flow | | |
+| 17 - Pyroclastic Flow | :star: | :star: |
 | 18 - Boiling Boulders | :star: | :star: |
 | 19 - Not Enough Materials | | |
 | 20 - Grove Positioning System | :star: | :star: |
-| 21 - Monkey Math | | |
-| 22 - Monkey Map | | |
+| 21 - Monkey Math | :star: | :star: |
+| 22 - Monkey Map | :star: | |
 | 23 - Unstable Diffusion | | |
 | 24 - Blizzard Basin | | |
 | 25 - Full of Hot Air | | |

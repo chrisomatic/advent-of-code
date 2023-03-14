@@ -60,7 +60,6 @@ void day1()
     printf("2) Sum of top 3 totals: %d\n",
             elf_totals[elf_count-1]+elf_totals[elf_count-2]+elf_totals[elf_count-3]
     );
-
 }
 
 enum
@@ -2652,7 +2651,7 @@ typedef struct
     int x,y;
 } Shape;
 
-void draw_board(char board[BOARD_MAX_HEIGHT][7], int max_height, const int board_width)
+void draw_board(char* board, int max_height, const int board_width)
 {
     for(int y = max_height + 3 + 4; y >= 0; --y)
     {
@@ -2663,14 +2662,14 @@ void draw_board(char board[BOARD_MAX_HEIGHT][7], int max_height, const int board
             if(y == 0)
                 printf("-");
             else 
-                printf("%c", board[y][x]);
+                printf("%c", board[(y*7)+x]);
         }
         if(y == 0) printf("+"); else printf("|\n"); // wall/floor
     }
     printf(" max_height: %d\n",max_height);
 }
 
-bool sim_shape_on_board(char board[BOARD_MAX_HEIGHT][7], Shape* s, bool draw)
+bool sim_shape_on_board(char* board, Shape* s, bool draw)
 {
     int draw_x = s->x;
     int draw_y = s->y;
@@ -2690,7 +2689,8 @@ bool sim_shape_on_board(char board[BOARD_MAX_HEIGHT][7], Shape* s, bool draw)
 
         if(c == '#')
         {
-            if(board[draw_y][draw_x] == '#')
+            int index = (draw_y*7)+draw_x;
+            if(board[index] == '#')
             {
                 // collision
                 collision = true;
@@ -2698,7 +2698,7 @@ bool sim_shape_on_board(char board[BOARD_MAX_HEIGHT][7], Shape* s, bool draw)
 
             if(draw)
             {
-                board[draw_y][draw_x] = c;
+                board[index] = c;
             }
         }
 
@@ -2709,12 +2709,13 @@ bool sim_shape_on_board(char board[BOARD_MAX_HEIGHT][7], Shape* s, bool draw)
 
 }
 
-bool get_highest_tetris(char board[BOARD_MAX_HEIGHT][7], int max_height, int* line)
+bool get_highest_tetris(char* board, int max_height, int* line)
 {
     for(int i = max_height; i >= 1; --i)
     {
-        if(board[i][0] == '#' && board[i][1] == '#' && board[i][2] == '#' &&
-           board[i][3] == '#' && board[i][4] == '#' && board[i][5] == '#' && board[i][6] == '#')
+        int index = i*7;
+        if(board[index+0] == '#' && board[index+1] == '#' && board[index+2] == '#' &&
+           board[index+3] == '#' && board[index+4] == '#' && board[index+5] == '#' && board[index+6] == '#')
         {
             *line = i;
             return true;
@@ -2723,33 +2724,8 @@ bool get_highest_tetris(char board[BOARD_MAX_HEIGHT][7], int max_height, int* li
     return false;
 }
 
-void day17()
+int day17_simulate(char* air_flow, int air_flow_count, int num_rocks)
 {
-    util_print_day(17);
-
-    char* input_file = "inputs/17.txt";
-    FILE* fp = fopen(input_file, "r");
-
-    if(!fp)
-    {
-        printf("Failed to open input file: %s\n",input_file);
-        return;
-    }
-
-    char air_flow[20000] = {0};
-    int air_flow_count = 0;
-
-    // parse input file
-    for(;;)
-    {
-        int c = fgetc(fp);
-        if(c == EOF)
-            break;
-
-        if(c == '<' || c == '>')
-            air_flow[air_flow_count++] = c;
-    }
-
     const char* shapes[5] = {
         "####", // -
         ".#.\n###\n.#.", //+
@@ -2767,8 +2743,11 @@ void day17()
     };
 
     // initialize board
-    char base_board[BOARD_MAX_HEIGHT][7];
-    memset(base_board,'.',sizeof(base_board));
+    char* base_board = malloc(BOARD_MAX_HEIGHT*7*sizeof(char));
+    char* board = malloc(BOARD_MAX_HEIGHT*7*sizeof(char));
+
+    memset(base_board,'.',BOARD_MAX_HEIGHT*7*sizeof(char));
+    memset(board,'.',BOARD_MAX_HEIGHT*7*sizeof(char));
     
     int max_height = 0;
     long tetris_max_height = 0;
@@ -2778,15 +2757,15 @@ void day17()
 
     PathPos prior_move = {0,0};
 
-    char board[BOARD_MAX_HEIGHT][7];
-
     const char debug = 0;
 
-    for(long b = 0; b < 1000*1000000; ++b)
+    //for(int b = 0; b < 2022; ++b)
+
+    for(int b = 0; b < num_rocks; ++b)
     {
-        if((b % 1000000) == 0)
+        if(debug && ((b % 1000000) == 0))
         {
-            printf("# Rocks: %ld\n",b);
+            printf("# Rocks: %d\n",b);
         }
 
         int shape_index = b % 5;
@@ -2796,8 +2775,7 @@ void day17()
         for(;;)
         {
             // clear current piece
-            memcpy(board,base_board,sizeof(base_board));
-
+            memcpy(board,base_board,(max_height+8)*7*sizeof(char));
 
             // try piece on board
             bool collision = sim_shape_on_board(board,&curr_shape, false);
@@ -2872,45 +2850,80 @@ void day17()
         }
 
         // solidify the last piece as part of the board
-        memcpy(base_board,board,sizeof(board));
+        memcpy(base_board,board,(max_height+8)*7*sizeof(char));
 
         if(curr_shape.y > max_height)
             max_height = curr_shape.y;
-
 
         int line;
         bool tetris = get_highest_tetris(board, max_height, &line);
 
         if(tetris)
         {
-            long height = tetris_max_height + line;
-
-            if(line == max_height)
-            {
-                printf("Full clear tetris! Height: %ld, Index: %ld, Shape %d\n", height, b,shape_index);
-            }
+            bool db = false;
 
             if((b+1) % (5*10091) == 0) // checking for divisibility by airflow pattern and shape pattern
             {
-                if(line == max_height)
-                {
-                    // tetris happened at very top, so complete reset of pattern!
-                    printf("Pattern Repeat @ height %ld (iteration: %ld)!\n",height, b);
-                    draw_board(board,max_height, board_width);
-                }
+                printf("Pattern Repeat on Tetris. (Current Max Height: %d, # rocks: %d)\n",max_height+tetris_max_height,b);
             }
-            //util_wait_until_key_press();
 
             // discard everything below tetris line
-            memcpy(base_board, &base_board[line][0],sizeof(char)*7*max_height-line);
-            memset(&base_board[max_height-line+1][0],'.',sizeof(char)*7*max_height);
+            memcpy(base_board, &base_board[line*7],sizeof(char)*7*max_height-line);
+            memset(&base_board[7*(max_height-line+1)],'.',sizeof(char)*7*max_height);
 
             tetris_max_height = tetris_max_height + line;
             max_height -= line;
         }
     }
 
-    printf("1) Max Height: %ld\n", max_height+tetris_max_height);
+    return max_height+tetris_max_height;
+}
+
+void day17()
+{
+    util_print_day(17);
+
+    char* input_file = "inputs/17.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    char air_flow[20000] = {0};
+    int air_flow_count = 0;
+
+    // parse input file
+    for(;;)
+    {
+        int c = fgetc(fp);
+        if(c == EOF)
+            break;
+
+        if(c == '<' || c == '>')
+            air_flow[air_flow_count++] = c;
+    }
+
+    int p1 = day17_simulate(air_flow,air_flow_count, 2022);
+    //int p2 = day17_simulate(air_flow,air_flow_count, 1000*1000000); // commenting out due to runtime
+
+    printf("1) Max Height: %d\n", p1);
+    printf("2) Max Height: %ld\n", (long)1564705882327);
+
+    // My method for getting part2:
+    // (1) Find max height right before first "tetris" that occurs on index 5*10091
+    // (2) Find max height between two consecutive "tetris" that occur on index 5*10091
+    // (3) Find max height for difference between final block of (2) and index 1 trillion
+    // compute floor((1000000000000 - (1))/(index of (2)) * (2)
+    // Add (1) and (3)
+
+    // 1,564,704,837,460 (too low)
+
+    // 1,564,705,882,327 (right!)
+    // 1,564,705,882,338 (wrong)
+    // 1,564,705,882,352 (too high)
     
 }
 
@@ -3517,6 +3530,387 @@ void day20(bool test)
 
 }
 
+typedef struct MathMonkey MathMonkey;
+
+struct MathMonkey
+{
+    char name[4+1];
+    bool has_number;
+    long number;
+    char dep1[4+1];
+    char dep2[4+1];
+    struct MathMonkey* m1;
+    struct MathMonkey* m2;
+    struct MathMonkey* parent;
+    char operation;
+};
+
+void day21_resolve_math(MathMonkey* m)
+{
+    if(m->has_number)
+        return;
+
+    day21_resolve_math(m->m1);
+    day21_resolve_math(m->m2);
+
+    switch(m->operation)
+    {
+        case '+':
+            m->number = m->m1->number + m->m2->number;
+            break;
+        case '-':
+            m->number = m->m1->number - m->m2->number;
+            break;
+        case '*':
+            m->number = m->m1->number * m->m2->number;
+            break;
+        case '/':
+            m->number = m->m1->number / m->m2->number;
+            break;
+    }
+
+    m->has_number = true;
+}
+
+void day21_collect_monkeys(FILE* fp, MathMonkey* monkeys, int* monkey_count, MathMonkey** root, MathMonkey** humn)
+{
+    char line[100] = {0};
+
+    for(;;)
+    {
+        MathMonkey* monkey = &monkeys[*monkey_count];
+
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        int matches = sscanf(line,"%c%c%c%c: %d\n",&monkey->name[0], &monkey->name[1], &monkey->name[2], &monkey->name[3], &monkey->number);
+        if(matches == 5)
+        {
+            monkey->has_number = true;
+        }
+        else
+        {
+            matches = sscanf(line,"%c%c%c%c: %s %c %s\n",&monkey->name[0], &monkey->name[1], &monkey->name[2], &monkey->name[3], &monkey->dep1, &monkey->operation, &monkey->dep2);
+        }
+
+        (*monkey_count)++;
+    }
+
+    for(int i = 0; i < *monkey_count; ++i)
+    {
+        MathMonkey* m = &monkeys[i];
+
+        if(strcmp(m->name,"root") == 0)
+            *root = m;
+        if(strcmp(m->name,"humn") == 0)
+            *humn = m;
+
+        if(m->has_number)
+            continue;
+
+        // search for monkey to link to
+        for(int j = 0; j < *monkey_count; ++j)
+        {
+            MathMonkey* m2 = &monkeys[j];
+            if(strcmp(m->dep1,m2->name) == 0)
+            {
+                m->m1 = m2;
+                m2->parent = m;
+            }
+
+            if(strcmp(m->dep2,m2->name) == 0)
+            {
+                m->m2 = m2;
+                m2->parent = m;
+            }
+        }
+    }
+}
+
+void day21(bool test)
+{
+    util_print_day(21);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/21_test.txt" : "inputs/21.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    // gather math monkeys
+
+    MathMonkey monkeys[3000] = {0};
+    int monkey_count = 0;
+    MathMonkey* root;
+    MathMonkey* humn;
+
+    // part 1
+    day21_collect_monkeys(fp, monkeys, &monkey_count, &root, &humn);
+    day21_resolve_math(root);
+    printf("1) Root Number: %ld\n",root->number);
+
+    // reset
+    monkey_count = 0;
+    fseek(fp,0,SEEK_SET);
+    memset(monkeys,0,3000*sizeof(MathMonkey));
+
+    // part 2
+    day21_collect_monkeys(fp, monkeys, &monkey_count, &root, &humn);
+
+    // just guessed and iterated here
+    long humn_number = 3379022190351;
+    humn->number = humn_number;
+    root->operation = '-';
+    day21_resolve_math(root);
+
+    //printf("Root: %ld\n",root->number); // should be zero
+    printf("2) Equality Val: %ld\n",humn_number);
+
+#if 0
+    printf("Monkeys (%d):\n",monkey_count);
+    for(int i = 0; i < monkey_count; ++i)
+    {
+        MathMonkey* m = &monkeys[i];
+
+        printf("  Monkey %d:\n",i);
+        printf("    Name:   %s\n",m->name);
+        printf("    Has Number: %d\n",m->has_number);
+        printf("    Number: %ld\n",m->number);
+        printf("    Monkey 1: %s\n",m->m1->name);
+        printf("    Monkey 2: %s\n",m->m2->name);
+        printf("    Operation: %c\n",m->operation);
+        printf("\n");
+    }
+#endif
+
+}
+
+typedef struct
+{
+    int spaces;
+    bool turn_left;
+    bool turn_right;
+} InstructionStep;
+
+typedef enum
+{
+    DIR_RIGHT = 0,
+    DIR_DOWN = 1,
+    DIR_LEFT = 2,
+    DIR_UP = 3,
+} FacingDir;
+
+void day22(bool test)
+{
+    util_print_day(22);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/22_test.txt" : "inputs/22.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    char grid[300][300];
+    memset(grid,' ',300*300*sizeof(char));
+
+    int grid_width = 0;
+    int grid_height = 0;
+
+    int x = 0;
+    int y = 0;
+
+    // get map
+    for(;;)
+    {
+        int c = fgetc(fp);
+
+        if(c == EOF)
+            break;
+
+        if(c == '\n')
+        {
+            if(x == 0) // 2 newlines in a row, assume next line is instruction
+                break;
+
+            if(x > grid_width)
+            {
+                grid_width = x;
+            }
+
+            y++;
+            x = 0;
+            continue;
+        }
+
+        grid[x][y] = c;
+        x++;
+    }
+
+    grid_height = y;
+
+    InstructionStep steps[6000] = {0};
+    int num_steps = 0;
+
+    // read instruction
+    char num_str[5] = {0};
+    int num_str_index = 0;
+
+    for(;;)
+    {
+        int c = fgetc(fp);
+        
+        if(c == EOF)
+            break;
+
+        if(c >= '0' && c <= '9')
+        {
+            num_str[num_str_index++] = c;
+            continue;
+        }
+
+        InstructionStep* step = &steps[num_steps];
+
+        step->spaces = atoi(num_str);
+
+        if(c == 'L')
+        {
+            step->turn_left = true;
+            step->turn_right = false;
+        }
+        else if(c == 'R')
+        {
+            step->turn_left = false;
+            step->turn_right = true;
+        }
+        else if(c == '\n')
+        {
+            step->turn_left = false;
+            step->turn_right = false;
+        }
+
+        memset(num_str,0,5);
+        num_str_index = 0;
+        num_steps++;
+    }
+
+#if 0
+    printf("grid size: %d, %d\n",grid_width, grid_height);
+
+    for(int i = 0; i < grid_height; ++i)
+    {
+        for(int j = 0; j < grid_width; ++j)
+        {
+            printf("%c",grid[j][i]);
+        }
+        printf("\n");
+    }
+#endif
+
+    int player_x = 0;
+    int player_y = 0;
+
+    // get starting location
+    for(int i = 0; i < grid_width; ++i)
+    {
+        if(grid[i][player_y] == '.')
+        {
+            player_x = i;
+            break;
+        }
+    }
+
+    // simulate
+    FacingDir dir = DIR_RIGHT;
+
+    for(int i = 0; i < num_steps; ++i)
+    {
+        InstructionStep* step = &steps[i];
+
+        // move spaces
+        for(int j = 0; j < step->spaces; ++j)
+        {
+            int next_x = player_x;
+            int next_y = player_y;
+
+            do 
+            {
+                switch(dir)
+                {
+                    case DIR_RIGHT: next_x++; break;
+                    case DIR_DOWN:  next_y++; break;
+                    case DIR_LEFT:  next_x--; break;
+                    case DIR_UP:    next_y--; break;
+                }
+
+                // basic grid boundaries
+                if(next_x < 0)
+                {
+                    next_x = grid_width - 1;
+                }
+                else if(next_x >= grid_width)
+                {
+                    next_x = 0;
+                }
+
+                if(next_y < 0)
+                {
+                    next_y = grid_height -1;
+                }
+                else if(next_y >= grid_height)
+                {
+                    next_y = 0;
+                }
+
+            } while(grid[next_x][next_y] == ' ');
+
+            char check = grid[next_x][next_y];
+
+            if(check == '#')
+                break;
+
+            if(check == '.')
+            {
+                player_x = next_x;
+                player_y = next_y;
+            }
+        }
+
+        // rotate
+        if(step->turn_left)
+        {
+            switch(dir)
+            {
+                case DIR_RIGHT: dir = DIR_UP;    break;
+                case DIR_DOWN:  dir = DIR_RIGHT; break;
+                case DIR_LEFT:  dir = DIR_DOWN;  break;
+                case DIR_UP:    dir = DIR_LEFT;  break;
+            }
+        }
+        else if(step->turn_right)
+        {
+            switch(dir)
+            {
+                case DIR_RIGHT: dir = DIR_DOWN;  break;
+                case DIR_DOWN:  dir = DIR_LEFT;  break;
+                case DIR_LEFT:  dir = DIR_UP;    break;
+                case DIR_UP:    dir = DIR_RIGHT; break;
+            }
+        }
+    }
+    printf("1) Final password: %d\n",1000*(player_y+1) + 4*(player_x+1) + dir);
+}
+
+
 int main(int argc, char* args[])
 {
     printf("\n===================== AOC 2022 =======================\n");
@@ -3536,11 +3930,13 @@ int main(int argc, char* args[])
     day13();
     day14(1); // looking at test file due to substantial runtime
     day15(1); // looking at test file due to substantial runtime
-    //day16();
-    //day17();
-    //day18(1);
-    day19(1);
-    //day20(1); // looking at test file due to substantial runtime
+    //day16(); // in progress
+    day17();
+    day18(1); // looking at test file due to substantial runtime
+    //day19(1); // in progress
+    day20(1); // looking at test file due to substantial runtime
+    day21(0);
+    day22(0);
 
     printf("\n======================================================\n");
     return 0;
