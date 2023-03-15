@@ -4012,19 +4012,42 @@ void day22(bool test)
 
     int debug = 0;
 
+    if(debug)
+    {
+        num_steps = 1000;
+        player_x += 49;
+        player_y = 52;
+    }
+
     // part 2
     // simulate
     dir = DIR_RIGHT;
 
     for(int i = 0; i < num_steps; ++i)
     {
-        InstructionStep* step = &steps[i];
+        InstructionStep* step = debug ? &steps[0] : &steps[i];
 
         if(debug)
         {
             day22_print_grid(grid,grid_width,grid_height, player_x, player_y);
-            util_wait_until_key_press();
-            printf("Move %d spaces %s\n", step->spaces, map_facing_dir_to_str(dir));
+            //util_wait_until_key_press();
+            char c;
+            scanf("%c%*c",&c);
+            printf("You pressed %c\n",c);
+
+            step->spaces = 1;
+
+            switch(c)
+            {
+                case 'w': dir = DIR_UP; break;
+                case 'a': dir = DIR_LEFT; break;
+                case 's': dir = DIR_DOWN; break;
+                case 'd': dir = DIR_RIGHT; break;
+                default: step->spaces = 0; break;
+            }
+
+            //printf("pressed %d\n",c);
+            //printf("Move %d spaces %s\n", step->spaces, map_facing_dir_to_str(dir));
         }
 
         // move spaces
@@ -4063,64 +4086,131 @@ void day22(bool test)
                 int rel_x = player_x - curr_corner->x;
                 int rel_y = player_y - curr_corner->y;
 
-                if(curr_face == 1)
+                if(test)
                 {
-                    switch(dir)
+                    if(curr_face == 1)
                     {
-                        case DIR_RIGHT: next_face = 6; next_dir = DIR_LEFT; rel_x = rel_x; rel_y = cube_face_len - rel_y - 1; break;
-                        case DIR_DOWN:  next_face = 4; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
-                        case DIR_LEFT:  next_face = 3; next_dir = DIR_DOWN; rel_x = rel_y; rel_y = 0; break;
-                        case DIR_UP:    next_face = 2; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 6; next_dir = DIR_LEFT; rel_x = rel_x; rel_y = cube_face_len - rel_y - 1; break;
+                            case DIR_DOWN:  next_face = 4; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                            case DIR_LEFT:  next_face = 3; next_dir = DIR_DOWN; rel_x = rel_y; rel_y = 0; break;
+                            case DIR_UP:    next_face = 2; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                        }
                     }
-                }
-                else if(curr_face == 2)
-                {
-                    switch(dir)
+                    else if(curr_face == 2)
                     {
-                        case DIR_RIGHT: next_face = 3; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
-                        case DIR_DOWN:  next_face = 5; next_dir = DIR_UP; rel_x = cube_face_len - 1; rel_y = rel_y; break;
-                        case DIR_LEFT:  next_face = 6; next_dir = DIR_UP; rel_x = rel_y; rel_y = cube_face_len - 1; break;
-                        case DIR_UP:    next_face = 1; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 3; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                            case DIR_DOWN:  next_face = 5; next_dir = DIR_UP; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                            case DIR_LEFT:  next_face = 6; next_dir = DIR_UP; rel_x = cube_face_len - rel_y -1; rel_y = cube_face_len - 1; break;
+                            case DIR_UP:    next_face = 1; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                        }
                     }
-                }
-                else if(curr_face == 3)
-                {
-                    switch(dir)
+                    else if(curr_face == 3)
                     {
-                        case DIR_RIGHT: next_face = 4; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
-                        case DIR_DOWN:  next_face = 5; next_dir = DIR_RIGHT; rel_y = cube_face_len - rel_x - 1; rel_x = 0; break;
-                        case DIR_LEFT:  next_face = 2; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
-                        case DIR_UP:    next_face = 1; next_dir = DIR_RIGHT; rel_y = rel_x; rel_x = 0; break;
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 4; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                            case DIR_DOWN:  next_face = 5; next_dir = DIR_RIGHT; rel_y = cube_face_len - rel_x - 1; rel_x = 0; break;
+                            case DIR_LEFT:  next_face = 2; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                            case DIR_UP:    next_face = 1; next_dir = DIR_RIGHT; rel_y = rel_x; rel_x = 0; break;
+                        }
                     }
-                }
-                else if(curr_face == 4)
-                {
-                    switch(dir)
+                    else if(curr_face == 4)
                     {
-                        case DIR_RIGHT: next_face = 6; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_y - 1; rel_y = 0; break;
-                        case DIR_DOWN:  next_face = 5; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
-                        case DIR_LEFT:  next_face = 3; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
-                        case DIR_UP:    next_face = 1; next_dir = DIR_UP;   rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 6; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_y - 1; rel_y = 0; break;
+                            case DIR_DOWN:  next_face = 5; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                            case DIR_LEFT:  next_face = 3; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                            case DIR_UP:    next_face = 1; next_dir = DIR_UP;   rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        }
                     }
-                }
-                else if(curr_face == 5)
-                {
-                    switch(dir)
+                    else if(curr_face == 5)
                     {
-                        case DIR_RIGHT: next_face = 6; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
-                        case DIR_DOWN:  next_face = 2; next_dir = DIR_UP; rel_x = cube_face_len - rel_x - 1; rel_y = cube_face_len-1; break;
-                        case DIR_LEFT:  next_face = 3; next_dir = DIR_UP; rel_x = cube_face_len - rel_y - 1; rel_y = cube_face_len-1; break;
-                        case DIR_UP:    next_face = 4; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 6; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                            case DIR_DOWN:  next_face = 2; next_dir = DIR_UP; rel_x = cube_face_len - rel_x - 1; rel_y = cube_face_len-1; break;
+                            case DIR_LEFT:  next_face = 3; next_dir = DIR_UP; rel_x = cube_face_len - rel_y - 1; rel_y = cube_face_len-1; break;
+                            case DIR_UP:    next_face = 4; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        }
                     }
-                }
-                else if(curr_face == 6)
-                {
-                    switch(dir)
+                    else if(curr_face == 6)
                     {
-                        case DIR_RIGHT: next_face = 1; next_dir = DIR_LEFT; rel_y = cube_face_len - rel_y - 1; rel_x = cube_face_len -1;break;
-                        case DIR_DOWN:  next_face = 2; next_dir = DIR_RIGHT; rel_y = cube_face_len - rel_x - 1; rel_x = 0; break;
-                        case DIR_LEFT:  next_face = 5; next_dir = DIR_LEFT; rel_x = cube_face_len -1; rel_y = rel_y; break;
-                        case DIR_UP:    next_face = 4; next_dir = DIR_LEFT; rel_y = cube_face_len - rel_x - 1; rel_x = cube_face_len - 1; break;
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 1; next_dir = DIR_LEFT; rel_y = cube_face_len - rel_y - 1; rel_x = cube_face_len -1;break;
+                            case DIR_DOWN:  next_face = 2; next_dir = DIR_RIGHT; rel_y = cube_face_len - rel_x - 1; rel_x = 0; break;
+                            case DIR_LEFT:  next_face = 5; next_dir = DIR_LEFT; rel_x = cube_face_len -1; rel_y = rel_y; break;
+                            case DIR_UP:    next_face = 4; next_dir = DIR_LEFT; rel_y = cube_face_len - rel_x - 1; rel_x = cube_face_len - 1; break;
+                        }
+                    }
+
+                }
+                else
+                {
+                    if(curr_face == 1)
+                    {
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 2; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                            case DIR_DOWN:  next_face = 3; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                            case DIR_LEFT:  next_face = 4; next_dir = DIR_RIGHT; rel_x = 0; rel_y = cube_face_len - rel_y - 1; break;
+                            case DIR_UP:    next_face = 6; next_dir = DIR_RIGHT; rel_y = rel_x; rel_x = 0; break;
+                        }
+                    }
+                    else if(curr_face == 2)
+                    {
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 5; next_dir = DIR_LEFT; rel_x = cube_face_len-1; rel_y = cube_face_len - rel_y - 1; break;
+                            case DIR_DOWN:  next_face = 3; next_dir = DIR_LEFT; rel_y = rel_x; rel_x = cube_face_len - 1; break;
+                            case DIR_LEFT:  next_face = 1; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                            case DIR_UP:    next_face = 6; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        }
+                    }
+                    else if(curr_face == 3)
+                    {
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 2; next_dir = DIR_UP; rel_x = rel_y; rel_y = cube_face_len -1; break;
+                            case DIR_DOWN:  next_face = 5; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                            case DIR_LEFT:  next_face = 4; next_dir = DIR_DOWN; rel_x = rel_y; rel_y = 0; break;
+                            case DIR_UP:    next_face = 1; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len -1; break;
+                        }
+                    }
+                    else if(curr_face == 4)
+                    {
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 5; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                            case DIR_DOWN:  next_face = 6; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                            case DIR_LEFT:  next_face = 1; next_dir = DIR_RIGHT; rel_x = 0; rel_y = cube_face_len - rel_y -1; break;
+                            case DIR_UP:    next_face = 3; next_dir = DIR_RIGHT; rel_y = rel_x; rel_x = 0; break;
+                        }
+                    }
+                    else if(curr_face == 5)
+                    {
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 2; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = cube_face_len - rel_y - 1; break;
+                            case DIR_DOWN:  next_face = 6; next_dir = DIR_LEFT; rel_y = rel_x; rel_x = cube_face_len-1; break;
+                            case DIR_LEFT:  next_face = 4; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                            case DIR_UP:    next_face = 3; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        }
+                    }
+                    else if(curr_face == 6)
+                    {
+                        switch(dir)
+                        {
+                            case DIR_RIGHT: next_face = 5; next_dir = DIR_UP; rel_x = rel_y; rel_y = cube_face_len -1;break;
+                            case DIR_DOWN:  next_face = 2; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                            case DIR_LEFT:  next_face = 1; next_dir = DIR_DOWN; rel_x = rel_y; rel_y = 0; break;
+                            case DIR_UP:    next_face = 4; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                        }
                     }
                 }
 
@@ -4167,15 +4257,272 @@ void day22(bool test)
 
     }
     
-    day22_print_grid(grid,grid_width,grid_height, player_x, player_y);
+    //day22_print_grid(grid,grid_width,grid_height, player_x, player_y);
 
-    printf("player pos: %d, %d, dir: %d\n", player_x+1, player_y+1, dir);
+    //printf("player pos: %d, %d, dir: %d\n", player_x+1, player_y+1, dir);
     printf("2) Final password: %d\n",1000*(player_y+1) + 4*(player_x+1) + dir);
 
     // 34306 too low
+    // 123054 too high
 
 }
 
+typedef struct
+{
+    int x;
+    int y;
+    int proposed_x;
+    int proposed_y;
+    int proposed_dir;
+} Elf;
+
+bool is_proposed_square_empty(int x, int y, int index, Elf* elves, int elf_count)
+{
+    for(int i = 0; i < elf_count; ++i)
+    {
+        if(i == index)
+            continue; // don't consider yourself
+
+        if(elves[i].proposed_x == x && elves[i].proposed_y == y)
+            return false;
+    }
+    return true;
+}
+
+bool is_square_empty(int x, int y, int index, Elf* elves, int elf_count)
+{
+    for(int i = 0; i < elf_count; ++i)
+    {
+        if(i == index)
+            continue; // don't consider yourself
+
+        if(elves[i].x == x && elves[i].y == y)
+            return false;
+    }
+    return true;
+}
+
+void day23(bool test)
+{
+    util_print_day(23);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/23_test.txt" : "inputs/23.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    int x = 0;
+    int y = 0;
+
+    Elf elves[1000] = {0};
+    int elf_count;
+
+    for(;;)
+    {
+        int c = fgetc(fp);
+
+        if(c == EOF)
+            break;
+
+        if(c == '\n')
+        {
+            y++;
+            x = 0;
+        }
+
+        if(c == '#')
+        {
+            elves[elf_count].x = x;
+            elves[elf_count].y = y;
+            elf_count++;
+        }
+
+        x++;
+    }
+
+    printf("Num elves: %d\n",elf_count);
+
+
+    // part 1
+    int round = 1;
+
+    int dir_priority[] = {0,1,2,3}; // N,S,W,E
+
+    const int debug = 1;
+
+    int grid_min_x = 0;
+    int grid_max_x = 0;
+    
+    int grid_min_y = 0;
+    int grid_max_y = 0;
+
+    for(;;)
+    {
+
+        // get grid size
+        for(int i = 0; i < elf_count; ++i)
+        {
+            Elf* elf = &elves[i];
+
+            if(elf->x < grid_min_x) grid_min_x = elf->x;
+            if(elf->x > grid_max_x) grid_max_x = elf->x;
+
+            if(elf->y < grid_min_y) grid_min_y = elf->y;
+            if(elf->y > grid_max_y) grid_max_y = elf->y;
+        }
+
+        printf("x: [%d, %d], y: [%d, %d]\n", grid_min_x, grid_max_x, grid_min_y, grid_max_y);
+
+        if(debug)
+        {
+            // print grid
+            for(int i = grid_min_y-1; i <= grid_max_y+1; ++i)
+            {
+                for(int j = grid_min_x-1; j <= grid_max_x+1; ++j)
+                {
+                    bool is_elf = false;
+                    for(int k = 0; k < elf_count; ++k)
+                    {
+                        if(j == elves[k].x && i == elves[k].y)
+                        {
+                            is_elf = true;
+                            break;
+                        }
+                    }
+                    printf("%c", is_elf ? '#' : '.');
+                }
+                printf("\n");
+            }
+
+            // wait
+            util_wait_until_key_press();
+        }
+
+        // 1st half
+
+        for(int i = 0; i < elf_count; ++i)
+        {
+            Elf* elf = &elves[i];
+
+            bool n = is_square_empty(elf->x, elf->y-1, i, elves, elf_count);
+            bool s = is_square_empty(elf->x, elf->y+1, i, elves, elf_count);
+            bool e = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
+            bool w = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
+
+            bool ne = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
+            bool nw = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
+            bool se = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
+            bool sw = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
+
+            if(n && s && e && w && ne && nw && se && sw)
+            {
+                // no other elves adjacent
+                // do nothing
+                continue;
+            }
+            else
+            {
+                elf->proposed_dir = -1; // reset
+
+                if(n || ne || nw)
+                {
+                    elf->proposed_dir = dir_priority[0];
+                }
+                else if(s || se || sw)
+                {
+                    elf->proposed_dir = dir_priority[1];
+                }
+                else if(w || nw || sw)
+                {
+                    elf->proposed_dir = dir_priority[2];
+                }
+                else if(e || ne || se)
+                {
+                    elf->proposed_dir = dir_priority[3];
+                }
+
+                if(elf->proposed_dir > -1)
+                {
+                    elf->proposed_x = elf->x;
+                    elf->proposed_y = elf->y;
+
+                    switch(elf->proposed_dir)
+                    {
+                        case 0: elf->proposed_y--; break; // north
+                        case 1: elf->proposed_y++; break; // south
+                        case 2: elf->proposed_x++; break; // west
+                        case 3: elf->proposed_x--; break; // east
+                    }
+                }
+            }
+        }
+
+        // 2nd half
+        // try to move everyone
+        for(int i = 0; i < elf_count; ++i)
+        {
+            Elf* elf = &elves[i];
+
+            bool empty = is_proposed_square_empty(elf->proposed_x, elf->proposed_y, i, elves, elf_count);
+
+            if(empty)
+            {
+                elf->x = elf->proposed_x;
+                elf->y = elf->proposed_y;
+            }
+        }
+
+        // resolve collisions
+        for(int i = 0; i < elf_count; ++i)
+        {
+            Elf* elf = &elves[i];
+
+            for(int j = 0; j < elf_count; ++j)
+            {
+                if(j == i)
+                    continue; // don't consider yourself
+
+                if(elves[j].x == elf->x && elves[j].y == elf->y)
+                {
+                    // collision
+                    // undo both elves movement
+                    switch(elf->proposed_dir)
+                    {
+                        case 0: elf->y++; break; // north
+                        case 1: elf->y--; break; // south
+                        case 2: elf->x--; break; // west
+                        case 3: elf->x++; break; // east
+                    }
+
+                    switch(elves[j].proposed_dir)
+                    {
+                        case 0: elves[j].y++; break; // north
+                        case 1: elves[j].y--; break; // south
+                        case 2: elves[j].x--; break; // west
+                        case 3: elves[j].x++; break; // east
+                    }
+                }
+            }
+        }
+        
+        // cycle dir priority
+        int temp_dir = dir_priority[0];
+
+        for(int i = 1; i < 4; ++i)
+        {
+            dir_priority[i-1] = dir_priority[i];
+        }
+        dir_priority[3] = temp_dir;
+
+        round++;
+    }
+}
 
 int main(int argc, char* args[])
 {
@@ -4203,7 +4550,7 @@ int main(int argc, char* args[])
     day20(1); // looking at test file due to substantial runtime
     day21(0);
     day22(0);
-    
+    day23(1);
 
     printf("\n======================================================\n");
     return 0;
