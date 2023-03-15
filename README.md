@@ -27,7 +27,7 @@ https://adventofcode.com/
 | 19 - Not Enough Materials | | |
 | 20 - Grove Positioning System | :star: | :star: |
 | 21 - Monkey Math | :star: | :star: |
-| 22 - Monkey Map | :star: | |
+| 22 - Monkey Map | :star: | :star: |
 | 23 - Unstable Diffusion | | |
 | 24 - Blizzard Basin | | |
 | 25 - Full of Hot Air | | |
