@@ -3705,6 +3705,39 @@ typedef enum
     DIR_UP = 3,
 } FacingDir;
 
+const char* map_facing_dir_to_str(FacingDir dir)
+{
+    switch(dir)
+    {
+        case DIR_RIGHT: return "Right";
+        case DIR_DOWN:  return "Down";
+        case DIR_LEFT:  return "Left";
+        case DIR_UP:    return "Up";
+    }
+    return "Unknown";
+}
+
+void day22_print_grid(char grid[300][300], int grid_width, int grid_height, int player_x, int player_y)
+{
+    printf("grid size: %d, %d\n",grid_width, grid_height);
+
+    for(int i = 0; i < grid_height; ++i)
+    {
+        for(int j = 0; j < grid_width; ++j)
+        {
+            if(j == player_x && i == player_y)
+            {
+                printf("P");
+                continue;
+            }
+            printf("%c", grid[j][i]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+
+}
+
 void day22(bool test)
 {
     util_print_day(22);
@@ -3723,11 +3756,25 @@ void day22(bool test)
     char grid[300][300];
     memset(grid,' ',300*300*sizeof(char));
 
+    uint8_t grid_faces[300][300];
+    memset(grid_faces,0,300*300*sizeof(uint8_t));
+
+    PathPos grid_corners[6];
+    memset(grid_corners,-1,6*sizeof(PathPos));
+
     int grid_width = 0;
     int grid_height = 0;
 
     int x = 0;
     int y = 0;
+
+    int cube_face_len = test ? 4 : 50;
+
+    int prio_cube_face = 0;
+    int curr_cube_face = 1;
+
+    int latest_cube = 1;
+    int cube_face_count = 0;
 
     // get map
     for(;;)
@@ -3748,11 +3795,42 @@ void day22(bool test)
             }
 
             y++;
+            if(y % cube_face_len == 0)
+            {
+                if(x % cube_face_len == 0)
+                {
+                    latest_cube = curr_cube_face;
+                }
+            }
+
             x = 0;
+            cube_face_count = 0;
+            curr_cube_face = latest_cube;
             continue;
         }
 
-        grid[x][y] = c;
+        if(c == '.' || c == '#')
+        {
+            grid[x][y] = c;
+            grid_faces[x][y] = curr_cube_face;
+
+            if(curr_cube_face == prio_cube_face+1)
+            {
+                if(grid_corners[prio_cube_face].x == -1)
+                {
+                    grid_corners[prio_cube_face].x = x;
+                    grid_corners[prio_cube_face].y = y;
+                }
+                prio_cube_face = curr_cube_face;
+            }
+
+            cube_face_count++;
+            if(cube_face_count % cube_face_len == 0)
+            {
+                curr_cube_face++;
+            }
+
+        }
         x++;
     }
 
@@ -3804,15 +3882,23 @@ void day22(bool test)
     }
 
 #if 0
-    printf("grid size: %d, %d\n",grid_width, grid_height);
-
     for(int i = 0; i < grid_height; ++i)
     {
         for(int j = 0; j < grid_width; ++j)
         {
-            printf("%c",grid[j][i]);
+            uint8_t face = grid_faces[j][i];
+
+            if(face == 0)
+                printf(" ");
+            else
+                printf("%c", '0' + face);
         }
         printf("\n");
+    }
+
+    for(int i = 0; i < 6; ++i)
+    {
+        printf("Grid Corner %d: %d, %d\n",i+1,grid_corners[i].x, grid_corners[i].y);
     }
 #endif
 
@@ -3829,6 +3915,7 @@ void day22(bool test)
         }
     }
 
+    // part 1
     // simulate
     FacingDir dir = DIR_RIGHT;
 
@@ -3908,6 +3995,185 @@ void day22(bool test)
         }
     }
     printf("1) Final password: %d\n",1000*(player_y+1) + 4*(player_x+1) + dir);
+    
+    // reset
+    player_x = 0;
+    player_y = 0;
+
+    // get starting location
+    for(int i = 0; i < grid_width; ++i)
+    {
+        if(grid[i][player_y] == '.')
+        {
+            player_x = i;
+            break;
+        }
+    }
+
+    int debug = 0;
+
+    // part 2
+    // simulate
+    dir = DIR_RIGHT;
+
+    for(int i = 0; i < num_steps; ++i)
+    {
+        InstructionStep* step = &steps[i];
+
+        if(debug)
+        {
+            day22_print_grid(grid,grid_width,grid_height, player_x, player_y);
+            util_wait_until_key_press();
+            printf("Move %d spaces %s\n", step->spaces, map_facing_dir_to_str(dir));
+        }
+
+        // move spaces
+        for(int j = 0; j < step->spaces; ++j)
+        {
+            uint8_t curr_face = grid_faces[player_x][player_y];
+
+            int next_x = player_x;
+            int next_y = player_y;
+
+            switch(dir)
+            {
+                case DIR_RIGHT: next_x++; break;
+                case DIR_DOWN:  next_y++; break;
+                case DIR_LEFT:  next_x--; break;
+                case DIR_UP:    next_y--; break;
+            }
+
+            bool oob = false;
+
+            oob |= (next_x < 0);
+            oob |= (next_x >= grid_width);
+            oob |= (next_y < 0);
+            oob |= (next_y >= grid_height);
+            oob |= (grid[next_x][next_y] == ' ');
+            
+            FacingDir next_dir = dir;
+
+            if(oob)
+            {
+                // map to another cube face
+                int next_face;
+
+                PathPos* curr_corner = &grid_corners[curr_face-1];
+
+                int rel_x = player_x - curr_corner->x;
+                int rel_y = player_y - curr_corner->y;
+
+                if(curr_face == 1)
+                {
+                    switch(dir)
+                    {
+                        case DIR_RIGHT: next_face = 6; next_dir = DIR_LEFT; rel_x = rel_x; rel_y = cube_face_len - rel_y - 1; break;
+                        case DIR_DOWN:  next_face = 4; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                        case DIR_LEFT:  next_face = 3; next_dir = DIR_DOWN; rel_x = rel_y; rel_y = 0; break;
+                        case DIR_UP:    next_face = 2; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                    }
+                }
+                else if(curr_face == 2)
+                {
+                    switch(dir)
+                    {
+                        case DIR_RIGHT: next_face = 3; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                        case DIR_DOWN:  next_face = 5; next_dir = DIR_UP; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                        case DIR_LEFT:  next_face = 6; next_dir = DIR_UP; rel_x = rel_y; rel_y = cube_face_len - 1; break;
+                        case DIR_UP:    next_face = 1; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_x - 1; rel_y = rel_y; break;
+                    }
+                }
+                else if(curr_face == 3)
+                {
+                    switch(dir)
+                    {
+                        case DIR_RIGHT: next_face = 4; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                        case DIR_DOWN:  next_face = 5; next_dir = DIR_RIGHT; rel_y = cube_face_len - rel_x - 1; rel_x = 0; break;
+                        case DIR_LEFT:  next_face = 2; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                        case DIR_UP:    next_face = 1; next_dir = DIR_RIGHT; rel_y = rel_x; rel_x = 0; break;
+                    }
+                }
+                else if(curr_face == 4)
+                {
+                    switch(dir)
+                    {
+                        case DIR_RIGHT: next_face = 6; next_dir = DIR_DOWN; rel_x = cube_face_len - rel_y - 1; rel_y = 0; break;
+                        case DIR_DOWN:  next_face = 5; next_dir = DIR_DOWN; rel_x = rel_x; rel_y = 0; break;
+                        case DIR_LEFT:  next_face = 3; next_dir = DIR_LEFT; rel_x = cube_face_len - 1; rel_y = rel_y; break;
+                        case DIR_UP:    next_face = 1; next_dir = DIR_UP;   rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                    }
+                }
+                else if(curr_face == 5)
+                {
+                    switch(dir)
+                    {
+                        case DIR_RIGHT: next_face = 6; next_dir = DIR_RIGHT; rel_x = 0; rel_y = rel_y; break;
+                        case DIR_DOWN:  next_face = 2; next_dir = DIR_UP; rel_x = cube_face_len - rel_x - 1; rel_y = cube_face_len-1; break;
+                        case DIR_LEFT:  next_face = 3; next_dir = DIR_UP; rel_x = cube_face_len - rel_y - 1; rel_y = cube_face_len-1; break;
+                        case DIR_UP:    next_face = 4; next_dir = DIR_UP; rel_x = rel_x; rel_y = cube_face_len - 1; break;
+                    }
+                }
+                else if(curr_face == 6)
+                {
+                    switch(dir)
+                    {
+                        case DIR_RIGHT: next_face = 1; next_dir = DIR_LEFT; rel_y = cube_face_len - rel_y - 1; rel_x = cube_face_len -1;break;
+                        case DIR_DOWN:  next_face = 2; next_dir = DIR_RIGHT; rel_y = cube_face_len - rel_x - 1; rel_x = 0; break;
+                        case DIR_LEFT:  next_face = 5; next_dir = DIR_LEFT; rel_x = cube_face_len -1; rel_y = rel_y; break;
+                        case DIR_UP:    next_face = 4; next_dir = DIR_LEFT; rel_y = cube_face_len - rel_x - 1; rel_x = cube_face_len - 1; break;
+                    }
+                }
+
+                PathPos* next_corner = &grid_corners[next_face-1];
+
+                next_x = next_corner->x + rel_x;
+                next_y = next_corner->y + rel_y;
+            }
+
+            char check = grid[next_x][next_y];
+
+            if(check == '#')
+                break;
+
+            if(check == '.')
+            {
+                player_x = next_x;
+                player_y = next_y;
+                dir = next_dir;
+            }
+        }
+
+        // rotate
+        if(step->turn_left)
+        {
+            switch(dir)
+            {
+                case DIR_RIGHT: dir = DIR_UP;    break;
+                case DIR_DOWN:  dir = DIR_RIGHT; break;
+                case DIR_LEFT:  dir = DIR_DOWN;  break;
+                case DIR_UP:    dir = DIR_LEFT;  break;
+            }
+        }
+        else if(step->turn_right)
+        {
+            switch(dir)
+            {
+                case DIR_RIGHT: dir = DIR_DOWN;  break;
+                case DIR_DOWN:  dir = DIR_LEFT;  break;
+                case DIR_LEFT:  dir = DIR_UP;    break;
+                case DIR_UP:    dir = DIR_RIGHT; break;
+            }
+        }
+
+    }
+    
+    day22_print_grid(grid,grid_width,grid_height, player_x, player_y);
+
+    printf("player pos: %d, %d, dir: %d\n", player_x+1, player_y+1, dir);
+    printf("2) Final password: %d\n",1000*(player_y+1) + 4*(player_x+1) + dir);
+
+    // 34306 too low
+
 }
 
 
@@ -3937,6 +4203,7 @@ int main(int argc, char* args[])
     day20(1); // looking at test file due to substantial runtime
     day21(0);
     day22(0);
+    
 
     printf("\n======================================================\n");
     return 0;
