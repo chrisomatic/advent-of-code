@@ -4302,6 +4302,28 @@ bool is_square_empty(int x, int y, int index, Elf* elves, int elf_count)
     return true;
 }
 
+void day23_print_grid(Elf* elves, int elf_count,int min_x, int max_x, int min_y, int max_y)
+{
+    // print grid
+    for(int i = min_y-1; i <= max_y+1; ++i)
+    {
+        for(int j = min_x-1; j <= max_x+1; ++j)
+        {
+            bool is_elf = false;
+            for(int k = 0; k < elf_count; ++k)
+            {
+                if(j == elves[k].x && i == elves[k].y)
+                {
+                    is_elf = true;
+                    break;
+                }
+            }
+            printf("%c", is_elf ? '#' : '.');
+        }
+        printf("\n");
+    }
+}
+
 void day23(bool test)
 {
     util_print_day(23);
@@ -4320,8 +4342,8 @@ void day23(bool test)
     int x = 0;
     int y = 0;
 
-    Elf elves[1000] = {0};
-    int elf_count;
+    Elf elves[6000] = {0};
+    int elf_count = 0;
 
     for(;;)
     {
@@ -4334,6 +4356,7 @@ void day23(bool test)
         {
             y++;
             x = 0;
+            continue;
         }
 
         if(c == '#')
@@ -4346,15 +4369,14 @@ void day23(bool test)
         x++;
     }
 
-    printf("Num elves: %d\n",elf_count);
-
+    //printf("Num elves: %d\n",elf_count);
 
     // part 1
     int round = 1;
 
     int dir_priority[] = {0,1,2,3}; // N,S,W,E
 
-    const int debug = 1;
+    const int debug = 0;
 
     int grid_min_x = 0;
     int grid_max_x = 0;
@@ -4362,9 +4384,11 @@ void day23(bool test)
     int grid_min_y = 0;
     int grid_max_y = 0;
 
+    int round10_empty_spaces = 0;
+    int equalibrium_round = 0;
+
     for(;;)
     {
-
         // get grid size
         for(int i = 0; i < elf_count; ++i)
         {
@@ -4377,34 +4401,24 @@ void day23(bool test)
             if(elf->y > grid_max_y) grid_max_y = elf->y;
         }
 
-        printf("x: [%d, %d], y: [%d, %d]\n", grid_min_x, grid_max_x, grid_min_y, grid_max_y);
-
         if(debug)
         {
-            // print grid
-            for(int i = grid_min_y-1; i <= grid_max_y+1; ++i)
+            printf("x: [%d, %d], y: [%d, %d]\n", grid_min_x, grid_max_x, grid_min_y, grid_max_y);
+            for(int i = 0; i < 4; ++i)
             {
-                for(int j = grid_min_x-1; j <= grid_max_x+1; ++j)
-                {
-                    bool is_elf = false;
-                    for(int k = 0; k < elf_count; ++k)
-                    {
-                        if(j == elves[k].x && i == elves[k].y)
-                        {
-                            is_elf = true;
-                            break;
-                        }
-                    }
-                    printf("%c", is_elf ? '#' : '.');
-                }
-                printf("\n");
+                printf("%d ",dir_priority[i]);
             }
+            printf("\n");
 
-            // wait
+            day23_print_grid(elves, elf_count,grid_min_x,grid_max_x, grid_min_y, grid_max_y);
             util_wait_until_key_press();
         }
 
+        printf("=== ROUND %d ===\n",round);
+
         // 1st half
+
+        bool elf_moved = false;
 
         for(int i = 0; i < elf_count; ++i)
         {
@@ -4412,13 +4426,13 @@ void day23(bool test)
 
             bool n = is_square_empty(elf->x, elf->y-1, i, elves, elf_count);
             bool s = is_square_empty(elf->x, elf->y+1, i, elves, elf_count);
-            bool e = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
-            bool w = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
+            bool e = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
+            bool w = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
 
-            bool ne = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
-            bool nw = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
-            bool se = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
-            bool sw = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
+            bool ne = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
+            bool nw = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
+            bool se = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
+            bool sw = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
 
             if(n && s && e && w && ne && nw && se && sw)
             {
@@ -4428,23 +4442,28 @@ void day23(bool test)
             }
             else
             {
+                elf_moved = true;
                 elf->proposed_dir = -1; // reset
 
-                if(n || ne || nw)
+                for(int d = 0; d < 4; ++d)
                 {
-                    elf->proposed_dir = dir_priority[0];
-                }
-                else if(s || se || sw)
-                {
-                    elf->proposed_dir = dir_priority[1];
-                }
-                else if(w || nw || sw)
-                {
-                    elf->proposed_dir = dir_priority[2];
-                }
-                else if(e || ne || se)
-                {
-                    elf->proposed_dir = dir_priority[3];
+                    int dir = dir_priority[d];
+                    bool move = false;
+                    
+                    switch(dir)
+                    {
+                        case 0: move = (n && ne && nw); break;
+                        case 1: move = (s && se && sw); break;
+                        case 2: move = (w && nw && sw); break;
+                        case 3: move = (e && ne && se); break;
+                    }
+
+                    if(move)
+                    {
+                        elf->proposed_dir = dir;
+                        break;
+                    }
+
                 }
 
                 if(elf->proposed_dir > -1)
@@ -4456,11 +4475,19 @@ void day23(bool test)
                     {
                         case 0: elf->proposed_y--; break; // north
                         case 1: elf->proposed_y++; break; // south
-                        case 2: elf->proposed_x++; break; // west
-                        case 3: elf->proposed_x--; break; // east
+                        case 2: elf->proposed_x--; break; // west
+                        case 3: elf->proposed_x++; break; // east
                     }
                 }
+                if(debug) printf("elf %d [%d, %d] proposed move %d\n",i, elf->x, elf->y, elf->proposed_dir);
             }
+        }
+
+        if(!elf_moved)
+        {
+            equalibrium_round = round;
+            day23_print_grid(elves, elf_count,grid_min_x,grid_max_x, grid_min_y, grid_max_y);
+            break;
         }
 
         // 2nd half
@@ -4468,45 +4495,39 @@ void day23(bool test)
         for(int i = 0; i < elf_count; ++i)
         {
             Elf* elf = &elves[i];
+            
+            if(elf->proposed_dir == -1)
+                continue;
 
             bool empty = is_proposed_square_empty(elf->proposed_x, elf->proposed_y, i, elves, elf_count);
 
             if(empty)
             {
+                // move elf
                 elf->x = elf->proposed_x;
                 elf->y = elf->proposed_y;
             }
         }
 
-        // resolve collisions
-        for(int i = 0; i < elf_count; ++i)
+        if(round == 11)
         {
-            Elf* elf = &elves[i];
-
-            for(int j = 0; j < elf_count; ++j)
+            // calculate part 1
+            for(int j = grid_min_x; j <= grid_max_x; ++j)
             {
-                if(j == i)
-                    continue; // don't consider yourself
-
-                if(elves[j].x == elf->x && elves[j].y == elf->y)
+                for(int i = grid_min_y; i <= grid_max_y; ++i)
                 {
-                    // collision
-                    // undo both elves movement
-                    switch(elf->proposed_dir)
+                    bool is_elf = false;
+                    for(int k = 0; k < elf_count; ++k)
                     {
-                        case 0: elf->y++; break; // north
-                        case 1: elf->y--; break; // south
-                        case 2: elf->x--; break; // west
-                        case 3: elf->x++; break; // east
+                        if(j == elves[k].x && i == elves[k].y)
+                        {
+                            is_elf = true;
+                            break;
+                        }
                     }
-
-                    switch(elves[j].proposed_dir)
-                    {
-                        case 0: elves[j].y++; break; // north
-                        case 1: elves[j].y--; break; // south
-                        case 2: elves[j].x--; break; // west
-                        case 3: elves[j].x++; break; // east
-                    }
+                    if(is_elf)
+                        continue;
+                    round10_empty_spaces++;
                 }
             }
         }
@@ -4522,6 +4543,13 @@ void day23(bool test)
 
         round++;
     }
+
+    printf("1) Empty Spaces: %d\n", round10_empty_spaces);
+    printf("2) Equalibrium Round: %d\n", equalibrium_round);
+    // 996 - too low
+    // 997 - too low
+    // 998 - too low
+
 }
 
 int main(int argc, char* args[])
@@ -4550,7 +4578,7 @@ int main(int argc, char* args[])
     day20(1); // looking at test file due to substantial runtime
     day21(0);
     day22(0);
-    day23(1);
+    day23(0);
 
     printf("\n======================================================\n");
     return 0;
