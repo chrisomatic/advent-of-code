@@ -28,6 +28,6 @@ https://adventofcode.com/
 | 20 - Grove Positioning System | :star: | :star: |
 | 21 - Monkey Math | :star: | :star: |
 | 22 - Monkey Map | :star: | :star: |
-| 23 - Unstable Diffusion | | |
+| 23 - Unstable Diffusion | :star: | |
 | 24 - Blizzard Basin | | |
-| 25 - Full of Hot Air | | |
+| 25 - Full of Hot Air | :star: | |
