@@ -4369,7 +4369,7 @@ void day23(bool test)
         x++;
     }
 
-    //printf("Num elves: %d\n",elf_count);
+    printf("Num elves: %d\n",elf_count);
 
     // part 1
     int round = 1;
@@ -4414,101 +4414,6 @@ void day23(bool test)
             util_wait_until_key_press();
         }
 
-        printf("=== ROUND %d ===\n",round);
-
-        // 1st half
-
-        bool elf_moved = false;
-
-        for(int i = 0; i < elf_count; ++i)
-        {
-            Elf* elf = &elves[i];
-
-            bool n = is_square_empty(elf->x, elf->y-1, i, elves, elf_count);
-            bool s = is_square_empty(elf->x, elf->y+1, i, elves, elf_count);
-            bool e = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
-            bool w = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
-
-            bool ne = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
-            bool nw = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
-            bool se = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
-            bool sw = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
-
-            if(n && s && e && w && ne && nw && se && sw)
-            {
-                // no other elves adjacent
-                // do nothing
-                continue;
-            }
-            else
-            {
-                elf_moved = true;
-                elf->proposed_dir = -1; // reset
-
-                for(int d = 0; d < 4; ++d)
-                {
-                    int dir = dir_priority[d];
-                    bool move = false;
-                    
-                    switch(dir)
-                    {
-                        case 0: move = (n && ne && nw); break;
-                        case 1: move = (s && se && sw); break;
-                        case 2: move = (w && nw && sw); break;
-                        case 3: move = (e && ne && se); break;
-                    }
-
-                    if(move)
-                    {
-                        elf->proposed_dir = dir;
-                        break;
-                    }
-
-                }
-
-                if(elf->proposed_dir > -1)
-                {
-                    elf->proposed_x = elf->x;
-                    elf->proposed_y = elf->y;
-
-                    switch(elf->proposed_dir)
-                    {
-                        case 0: elf->proposed_y--; break; // north
-                        case 1: elf->proposed_y++; break; // south
-                        case 2: elf->proposed_x--; break; // west
-                        case 3: elf->proposed_x++; break; // east
-                    }
-                }
-                if(debug) printf("elf %d [%d, %d] proposed move %d\n",i, elf->x, elf->y, elf->proposed_dir);
-            }
-        }
-
-        if(!elf_moved)
-        {
-            equalibrium_round = round;
-            day23_print_grid(elves, elf_count,grid_min_x,grid_max_x, grid_min_y, grid_max_y);
-            break;
-        }
-
-        // 2nd half
-        // try to move everyone
-        for(int i = 0; i < elf_count; ++i)
-        {
-            Elf* elf = &elves[i];
-            
-            if(elf->proposed_dir == -1)
-                continue;
-
-            bool empty = is_proposed_square_empty(elf->proposed_x, elf->proposed_y, i, elves, elf_count);
-
-            if(empty)
-            {
-                // move elf
-                elf->x = elf->proposed_x;
-                elf->y = elf->proposed_y;
-            }
-        }
-
         if(round == 11)
         {
             // calculate part 1
@@ -4530,6 +4435,101 @@ void day23(bool test)
                     round10_empty_spaces++;
                 }
             }
+            printf("1) Empty Spaces: %d\n",round10_empty_spaces);
+        }
+
+        printf("=== ROUND %d ===\n",round);
+
+        // 1st half
+
+        for(int i = 0; i < elf_count; ++i)
+        {
+            Elf* elf = &elves[i];
+
+            bool n = is_square_empty(elf->x, elf->y-1, i, elves, elf_count);
+            bool s = is_square_empty(elf->x, elf->y+1, i, elves, elf_count);
+            bool e = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
+            bool w = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
+
+            bool ne = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
+            bool nw = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
+            bool se = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
+            bool sw = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
+
+            elf->proposed_dir = -1; // reset
+
+            if(n && s && e && w && ne && nw && se && sw)
+            {
+                // no other elves adjacent
+                // do nothing
+                continue;
+            }
+            else
+            {
+                for(int d = 0; d < 4; ++d)
+                {
+                    int dir = dir_priority[d];
+                    bool move = false;
+                    
+                    switch(dir)
+                    {
+                        case 0: move = (n && ne && nw); break;
+                        case 1: move = (s && se && sw); break;
+                        case 2: move = (w && nw && sw); break;
+                        case 3: move = (e && ne && se); break;
+                    }
+
+                    if(move)
+                    {
+                        elf->proposed_dir = dir;
+                        break;
+                    }
+                }
+
+                if(elf->proposed_dir > -1)
+                {
+                    elf->proposed_x = elf->x;
+                    elf->proposed_y = elf->y;
+
+                    switch(elf->proposed_dir)
+                    {
+                        case 0: elf->proposed_y--; break; // north
+                        case 1: elf->proposed_y++; break; // south
+                        case 2: elf->proposed_x--; break; // west
+                        case 3: elf->proposed_x++; break; // east
+                    }
+                }
+                if(debug) printf("elf %d [%d, %d] proposed move %d\n",i, elf->x, elf->y, elf->proposed_dir);
+            }
+        }
+
+        // 2nd half
+        // try to move everyone
+        bool elf_moved = false;
+
+        for(int i = 0; i < elf_count; ++i)
+        {
+            Elf* elf = &elves[i];
+            
+            if(elf->proposed_dir == -1)
+                continue;
+
+            bool empty = is_proposed_square_empty(elf->proposed_x, elf->proposed_y, i, elves, elf_count);
+
+            if(empty)
+            {
+                // move elf
+                elf_moved = true;
+                elf->x = elf->proposed_x;
+                elf->y = elf->proposed_y;
+            }
+        }
+
+        if(!elf_moved)
+        {
+            equalibrium_round = round;
+            day23_print_grid(elves, elf_count,grid_min_x,grid_max_x, grid_min_y, grid_max_y);
+            break;
         }
         
         // cycle dir priority
@@ -4544,12 +4544,330 @@ void day23(bool test)
         round++;
     }
 
-    printf("1) Empty Spaces: %d\n", round10_empty_spaces);
-    printf("2) Equalibrium Round: %d\n", equalibrium_round);
-    // 996 - too low
-    // 997 - too low
-    // 998 - too low
+    int isolated = 0;
+    for(int i = 0; i < elf_count; ++i)
+    {
+        Elf* elf = &elves[i];
 
+        bool n = is_square_empty(elf->x, elf->y-1, i, elves, elf_count);
+        bool s = is_square_empty(elf->x, elf->y+1, i, elves, elf_count);
+        bool e = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
+        bool w = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
+
+        bool ne = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
+        bool nw = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
+        bool se = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
+        bool sw = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
+
+        if(n && s && e && w && ne && nw && se && sw)
+            isolated++;
+    }
+
+    printf("elf count: %d, isolated: %d\n",elf_count, isolated);
+
+    printf("2) Equalibrium Round: %d\n", equalibrium_round);
+
+    // 981  - wrong
+    // 996  - too low
+    // 997  - too low
+    // 998  - too low
+    // 999  - wrong
+    // 1000 - wrong
+    // 1001 - wrong
+    // 1002 - wrong
+    // 1003 - wrong
+
+}
+
+typedef struct
+{
+    int x;
+    int y;
+    char dir;
+} Blizzard;
+
+void day_24_print_grid(Blizzard* blizzards, int blizzard_count, PathPos* walls, int wall_count, int grid_width, int grid_height)
+{
+    for(int i = 0; i < grid_height; ++i)
+    {
+        for(int j = 0; j < grid_width; ++j)
+        {
+            bool is_wall = false;
+
+            for(int w = 0; w < wall_count; ++w)
+            {
+                if(walls[w].x == j && walls[w].y == i)
+                    is_wall = true;
+            }
+
+            if(is_wall)
+            {
+                printf("#");
+                continue;
+            }
+
+            char blizzard_dir = ' ';
+            int blizzard_n = 0;
+            for(int b = 0; b < blizzard_count; ++b)
+            {
+                if(blizzards[b].x == j && blizzards[b].y == i)
+                {
+                    blizzard_dir = blizzards[b].dir;
+                    blizzard_n++;
+                }
+            }
+
+            if(blizzard_n > 0)
+            {
+                printf("%c",blizzard_n == 1 ? blizzard_dir : '0' + blizzard_n);
+                continue;
+            }
+
+            printf(".");
+        }
+        printf("\n");
+    }
+}
+
+void day24(bool test)
+{
+    util_print_day(24);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/24_test.txt" : "inputs/24.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    int x = 0;
+    int y = 0;
+
+    Blizzard blizzards[1000] = {0};
+    int blizzard_count = 0;
+
+    int grid_width = 0;
+    int grid_height = 0;
+
+    PathPos walls[1000] = {0};
+    int wall_count;
+    PathPos start = {0,0};
+
+    // parse out dem blizzards
+    for(;;)
+    {
+        int c = fgetc(fp);
+        if(c == EOF)
+            break;
+
+        if(c == '\n')
+        {
+            y++;
+            if(x > grid_width)
+                grid_width = x;
+            x = 0;
+            continue;
+        }
+
+        if(c == '#')
+        {
+            walls[wall_count].x = x;
+            walls[wall_count].y = y;
+            wall_count++;
+            x++;
+            continue;
+        }
+
+        if(c == '.')
+        {
+            // floor
+            if(y == 0)
+            {
+                start.x = x;
+                start.y = y;
+            }
+            x++;
+            continue;
+        }
+
+        Blizzard* b = &blizzards[blizzard_count++];
+
+        b->x = x;
+        b->y = y;
+        b->dir = c;
+        x++;
+    }
+
+    grid_height = y;
+
+    printf("Grid Size: %d, %d\n",grid_width, grid_height);
+
+    day_24_print_grid(blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+    util_wait_until_key_press();
+
+    // simulate blizzards
+    for(;;)
+    {
+
+        for(int i = 0; i < blizzard_count; ++i)
+        {
+            Blizzard* b = &blizzards[i];
+            switch(b->dir)
+            {
+                case '<': b->x--; break;
+                case '>': b->x++; break;
+                case '^': b->y--; break;
+                case 'v': b->y++; break;
+            }
+
+            if(b->x <= 0) b->x = grid_width - 2;
+            else if(b->x >= grid_width -1) b->x = 1;
+            if(b->y <= 0) b->y = grid_height - 2;
+            else if(b->y >= grid_height -1) b->y = 1;
+        }
+
+        day_24_print_grid(blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+        util_wait_until_key_press();
+    }
+}
+
+long UNSNAFU(char* s, int len)
+{
+    long number = 0;
+    int places = 0;
+    for(int i = len-1; i >= 0; i--)
+    {
+        char c = s[i];
+        int val = 0;
+        switch(c)
+        {
+            case '=': val = -2; break;
+            case '-': val = -1; break;
+            case '0': val = 0; break;
+            case '1': val = 1; break;
+            case '2': val = 2; break;
+        }
+        number += val*(pow(5,places));
+        places++;
+    }
+
+    return number;
+}
+
+char* SNAFU(long n)
+{
+    // get largest needed exponent
+    int exp = 0;
+    for(;;)
+    {
+        long test = pow(5,exp);
+        for(int p = 0; p < exp; ++p)
+        {
+            test += 2*pow(5,p);
+        }
+
+        if(test >= n)
+        {
+            break;
+        }
+
+        exp++;
+    }
+
+
+    int places = exp+1;
+
+    char* s = calloc(places,sizeof(char));
+    int s_i = 0;
+
+    for(int i = exp; i >= 0; --i)
+    {
+        int n_dir = (n < 0 ? -1 : 1);
+
+        // find value at position i
+        for(int j = -2; j <= 2; ++j)
+        {
+            long test = j*pow(5,i);
+            for(int e = 0; e < i; ++e)
+            {
+                test += (-2*pow(5,e));
+            }
+
+            if(test-n >= 0 || j == 2)
+            {
+                int k;
+                if(test-n == 0)
+                {
+                    k = j;
+                }
+                else if(test-n >= 0)
+                {
+                    k = j-1;
+                }
+                else
+                {
+                    // j==2
+                    k = j;
+                }
+
+                if(s_i == 0 && k == 0)
+                {
+                    // disregard leading zeros
+                    break;
+                }
+                
+                n -= (k*pow(5,i));
+
+                switch(k)
+                {
+                    case -2: s[s_i] = '='; break;
+                    case -1: s[s_i] = '-'; break;
+                    case  0: s[s_i] = '0'; break;
+                    case  1: s[s_i] = '1'; break;
+                    case  2: s[s_i] = '2'; break;
+                }
+                s_i++;
+                break;
+            }
+        }
+    }
+
+    return s;
+}
+
+void day25(bool test)
+{
+    util_print_day(25);
+
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/25_test.txt" : "inputs/25.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    char s[100+1] = {0};
+
+    long sum = 0;
+    for(;;)
+    {
+        if(fgets(s,100,fp) == NULL)
+            break;
+
+        long n = UNSNAFU(s,strlen(s)-1); // -1 because of newline
+        sum += n;
+    }
+
+    char* snafu_number = SNAFU(sum);
+    printf("1) SNAFU: %s\n",snafu_number);
 }
 
 int main(int argc, char* args[])
@@ -4579,6 +4897,8 @@ int main(int argc, char* args[])
     day21(0);
     day22(0);
     day23(0);
+    //day24(1); // in progress
+    //day25(0);
 
     printf("\n======================================================\n");
     return 0;
