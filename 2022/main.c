@@ -3171,6 +3171,14 @@ typedef struct
     Robot robot_geode;
 } Blueprint;
 
+enum MaterialTarget
+{
+    TARGET_ORE,
+    TARGET_CLAY,
+    TARGET_OBSIDIAN,
+    TARGET_GEODE,
+};
+
 void day19(bool test)
 {
     util_print_day(19);
@@ -3218,7 +3226,18 @@ void day19(bool test)
         int total_required_clay = bp->robot_ore.cost_clay + bp->robot_clay.cost_clay + bp->robot_obsidian.cost_clay + bp->robot_geode.cost_clay;
         int total_required_obsidian = bp->robot_ore.cost_obsidian + bp->robot_clay.cost_obsidian + bp->robot_obsidian.cost_obsidian + bp->robot_geode.cost_obsidian;
 
+        int max_required_ore = MAX(MAX(MAX(bp->robot_ore.cost_ore, bp->robot_clay.cost_ore),bp->robot_obsidian.cost_ore),bp->robot_geode.cost_ore);
+        int max_required_clay = MAX(MAX(MAX(bp->robot_ore.cost_clay, bp->robot_clay.cost_clay),bp->robot_obsidian.cost_clay),bp->robot_geode.cost_clay);
+        int max_required_obsidian = MAX(MAX(MAX(bp->robot_ore.cost_obsidian, bp->robot_clay.cost_obsidian),bp->robot_obsidian.cost_obsidian),bp->robot_geode.cost_obsidian);
+        int max_required_total = max_required_ore + max_required_clay + max_required_obsidian;
+
+        float ideal_ratio_ore = max_required_ore / (float)max_required_total;
+        float ideal_ratio_clay = max_required_clay / (float)max_required_total;
+        float ideal_ratio_obsidian = max_required_obsidian / (float)max_required_total;
+
         printf("totals needed: %02d, %02d, %02d\n", total_required_ore, total_required_clay, total_required_obsidian);
+        printf("maxes  needed: %02d, %02d, %02d\n", max_required_ore, max_required_clay, max_required_obsidian);
+        printf("ideal  ratios: %f, %f, %f\n", ideal_ratio_ore, ideal_ratio_clay, ideal_ratio_obsidian);
 
         // init
         int count_ore = 0;
@@ -3232,11 +3251,11 @@ void day19(bool test)
         int count_geode_robot = 0;
 
         // simulate
-        int m = 1;
+        int m = 24;
 
         for(;;)
         {
-            if(m > 24)
+            if(m <= 0)
                 break;
 
             // mine resources
@@ -3269,29 +3288,45 @@ void day19(bool test)
             }
             else
             {
-                if(count_obsidian_robot == 0)
-                {
-                    // get most needed robot
-                    int ore_value = total_required_ore - count_ore - count_ore_robot;
-                    int clay_value = total_required_clay - count_clay - count_clay_robot;
-                    int obsidian_value = total_required_obsidian - count_obsidian - count_obsidian_robot;
+                // pick target material
+                int target = 0;
 
-                    if(can_afford_obsidian_robot && obsidian_value > clay_value && obsidian_value > ore_value)
+                if(count_clay_robot == 0)
+                {
+                    target = TARGET_CLAY;
+                }
+                else
+                {
+                    int proj_output_ore = m * count_ore_robot + count_ore;
+                    int proj_output_clay = m * count_clay_robot + count_clay;
+                    int proj_output_obsidian = m * count_obsidian_robot + count_obsidian;
+                    int proj_output_total = proj_output_ore + proj_output_clay + proj_output_obsidian;
+
+                    float proj_ratio_ore = proj_output_ore / (float)proj_output_total;
+                    float proj_ratio_clay = proj_output_clay / (float)proj_output_total;
+                    float proj_ratio_obsidian = proj_output_obsidian / (float)proj_output_total;
+
+                    float diff_ratio_ore = ideal_ratio_ore - proj_ratio_ore;
+                    float diff_ratio_clay = ideal_ratio_clay - proj_ratio_clay;
+                    float diff_ratio_obsidian = ideal_ratio_obsidian - proj_ratio_obsidian;
+
+                    if(diff_ratio_ore > diff_ratio_clay && diff_ratio_ore > diff_ratio_obsidian)
                     {
-                        // Obsidian Robot
-                        printf("Buying Obsidian Robot!\n");
-                        count_ore  -= bp->robot_obsidian.cost_ore;
-                        count_clay -= bp->robot_obsidian.cost_clay;
-                        build_obsidian = true;
+                        target = TARGET_ORE;
                     }
-                    if(can_afford_clay_robot && clay_value > obsidian_value && clay_value && ore_value)
+                    else if(diff_ratio_clay > diff_ratio_ore && diff_ratio_clay > diff_ratio_obsidian)
                     {
-                        // Clay Robot
-                        printf("Buying Clay Robot!\n");
-                        count_ore -= bp->robot_clay.cost_ore;
-                        build_clay = true;
+                        target = TARGET_CLAY;
                     }
-                    if(can_afford_ore_robot && ore_value > obsidian_value && ore_value > clay_value)
+                    else
+                    {
+                        target = TARGET_OBSIDIAN;
+                    }
+                }
+
+                if(target == TARGET_ORE)
+                {
+                    if(can_afford_ore_robot)
                     {
                         // Ore Robot
                         printf("Buying Ore Robot!\n");
@@ -3299,7 +3334,27 @@ void day19(bool test)
                         build_ore = true;
                     }
                 }
-
+                else if(target == TARGET_CLAY)
+                {
+                    if(can_afford_clay_robot)
+                    {
+                        // Clay Robot
+                        printf("Buying Clay Robot!\n");
+                        count_ore -= bp->robot_clay.cost_ore;
+                        build_clay = true;
+                    }
+                }
+                else if(target == TARGET_OBSIDIAN)
+                {
+                    if(can_afford_obsidian_robot)
+                    {
+                        // Obsidian Robot
+                        printf("Buying Obsidian Robot!\n");
+                        count_ore  -= bp->robot_obsidian.cost_ore;
+                        count_clay -= bp->robot_obsidian.cost_clay;
+                        build_obsidian = true;
+                    }
+                }
             }
 
             if(build_ore || build_clay || build_obsidian || build_geode)
@@ -3311,17 +3366,17 @@ void day19(bool test)
                 count_obsidian += count_obsidian_robot;
                 count_geode    += count_geode_robot;
 
-                ++m;
-
-                printf("[%02d min] [Mined %d %d %d %d], [Robots %d,%d,%d,%d], [Afford? %d %d %d %d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot, can_afford_ore_robot, can_afford_clay_robot, can_afford_obsidian_robot, can_afford_geode_robot);
+                --m;
 
                 if(build_ore) count_ore_robot++;
                 else if(build_clay) count_clay_robot++;
                 else if(build_obsidian) count_obsidian_robot++;
                 else if(build_geode) count_geode_robot++;
+
+                printf("[%02d min] [Mined %d %d %d %d], [Robots %d,%d,%d,%d], [Afford? %d %d %d %d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot, can_afford_ore_robot, can_afford_clay_robot, can_afford_obsidian_robot, can_afford_geode_robot);
             }
 
-            ++m;
+            --m;
         }
 
         printf("Geode count: %d\n",count_geode);
@@ -4297,8 +4352,17 @@ bool is_proposed_square_empty(int x, int y, int index, Elf* elves, int elf_count
         if(i == index)
             continue; // don't consider yourself
 
-        if(elves[i].proposed_x == x && elves[i].proposed_y == y)
-            return false;
+        if(elves[i].proposed_dir == -1)
+        {
+            // elf didn't propose a move, don't move on him
+            if(elves[i].x == x && elves[i].y == y)
+                return false;
+        }
+        else
+        {
+            if(elves[i].proposed_x == x && elves[i].proposed_y == y)
+                return false;
+        }
     }
     return true;
 }
@@ -4383,14 +4447,14 @@ void day23(bool test)
         x++;
     }
 
-    printf("Num elves: %d\n",elf_count);
+    //printf("Num elves: %d\n",elf_count);
 
     // part 1
     int round = 1;
 
     int dir_priority[] = {0,1,2,3}; // N,S,W,E
 
-    const int debug = 1;
+    const int debug = 0;
 
     int grid_min_x = 0;
     int grid_max_x = 0;
@@ -4452,7 +4516,7 @@ void day23(bool test)
             printf("1) Empty Spaces: %d\n",round10_empty_spaces);
         }
 
-        printf("=== ROUND %d ===\n",round);
+        if(debug) printf("=== ROUND %d ===\n",round);
 
         // 1st half
 
@@ -4542,7 +4606,7 @@ void day23(bool test)
         if(!elf_moved)
         {
             equalibrium_round = round;
-            day23_print_grid(elves, elf_count,grid_min_x,grid_max_x, grid_min_y, grid_max_y);
+            //day23_print_grid(elves, elf_count,grid_min_x,grid_max_x, grid_min_y, grid_max_y);
             break;
         }
         
@@ -4558,39 +4622,7 @@ void day23(bool test)
         round++;
     }
 
-    int isolated = 0;
-    for(int i = 0; i < elf_count; ++i)
-    {
-        Elf* elf = &elves[i];
-
-        bool n = is_square_empty(elf->x, elf->y-1, i, elves, elf_count);
-        bool s = is_square_empty(elf->x, elf->y+1, i, elves, elf_count);
-        bool e = is_square_empty(elf->x+1, elf->y, i, elves, elf_count);
-        bool w = is_square_empty(elf->x-1, elf->y, i, elves, elf_count);
-
-        bool ne = is_square_empty(elf->x+1, elf->y-1, i, elves, elf_count);
-        bool nw = is_square_empty(elf->x-1, elf->y-1, i, elves, elf_count);
-        bool se = is_square_empty(elf->x+1, elf->y+1, i, elves, elf_count);
-        bool sw = is_square_empty(elf->x-1, elf->y+1, i, elves, elf_count);
-
-        if(n && s && e && w && ne && nw && se && sw)
-            isolated++;
-    }
-
-    printf("elf count: %d, isolated: %d\n",elf_count, isolated);
-
     printf("2) Equalibrium Round: %d\n", equalibrium_round);
-
-    // 981  - wrong
-    // 996  - too low
-    // 997  - too low
-    // 998  - too low
-    // 999  - wrong
-    // 1000 - wrong
-    // 1001 - wrong
-    // 1002 - wrong
-    // 1003 - wrong
-    // 1004 - wrong
 
 }
 
@@ -4900,15 +4932,15 @@ int main(int argc, char* args[])
     day9();
     day10();
     day11();
-    day12(1); // looking at test file due to substantial runtime
+    day12(1);
     day13();
-    day14(1); // looking at test file due to substantial runtime
-    day15(1); // looking at test file due to substantial runtime
+    day14(1);
+    day15(1);
     //day16(); // in progress
     day17();
-    day18(1); // looking at test file due to substantial runtime
+    day18(1);
     day19(1); // in progress
-    //day20(1); // looking at test file due to substantial runtime
+    //day20(1);
     //day21(0);
     //day22(0);
     //day23(1);
