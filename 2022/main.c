@@ -3179,6 +3179,64 @@ enum MaterialTarget
     TARGET_GEODE,
 };
 
+typedef struct
+{
+    int count_ore;
+    int count_clay;
+    int count_obsidian;
+    int count_geode;
+
+    int count_robot_ore;
+    int count_robot_clay;
+    int count_robot_obsidian;
+    int count_robot_geode;
+
+    bool build_ore;
+    bool build_clay;
+    bool build_obsidian;
+    bool build_geode;
+
+} MineBackpack;
+
+void pack_gather_resources(MineBackpack* pack)
+{
+    pack->count_ore      += pack->count_robot_ore;
+    pack->count_clay     += pack->count_robot_clay;
+    pack->count_obsidian += pack->count_robot_obsidian;
+    pack->count_geode    += pack->count_robot_geode;
+}
+
+int time_to_get_required(MineBackpack* pack, Robot* robot, int m)
+{
+    for(int i = m; i <= 300; ++i)
+    {
+        //printf("i: %d\n",i);
+        pack_gather_resources(pack);
+
+        //printf("ore count: %d\n",pack->count_ore);
+
+        bool got_ore = (pack->count_ore >= robot->cost_ore);
+        bool got_clay = (pack->count_clay >= robot->cost_clay);
+        bool got_obsidian = (pack->count_obsidian >= robot->cost_obsidian);
+
+        if(got_ore && got_clay && got_obsidian)
+        {
+            //printf("satisifed\n");
+            return i;
+        }
+    }
+
+    return 300;
+}
+
+void buy_robot(MineBackpack* pack, Robot* robot, bool* build_flag)
+{
+    pack->count_ore -= robot->cost_ore;
+    pack->count_clay -= robot->cost_clay;
+    pack->count_obsidian -= robot->cost_obsidian;
+    *build_flag = true;
+}
+
 void day19(bool test)
 {
     util_print_day(19);
@@ -3197,6 +3255,7 @@ void day19(bool test)
     Blueprint blueprints[50] = {0};
     int blueprint_count = 0;
 
+    // parse blueprints
     for(;;)
     {
         Blueprint* bp = &blueprints[blueprint_count];
@@ -3222,33 +3281,9 @@ void day19(bool test)
         printf("  Geode Robot Cost:    [%02d %02d %02d]\n", bp->robot_geode.cost_ore, bp->robot_geode.cost_clay, bp->robot_geode.cost_obsidian);
         printf("=================================\n");
 
-        int total_required_ore = bp->robot_ore.cost_ore + bp->robot_clay.cost_ore + bp->robot_obsidian.cost_ore + bp->robot_geode.cost_ore;
-        int total_required_clay = bp->robot_ore.cost_clay + bp->robot_clay.cost_clay + bp->robot_obsidian.cost_clay + bp->robot_geode.cost_clay;
-        int total_required_obsidian = bp->robot_ore.cost_obsidian + bp->robot_clay.cost_obsidian + bp->robot_obsidian.cost_obsidian + bp->robot_geode.cost_obsidian;
-
-        int max_required_ore = MAX(MAX(MAX(bp->robot_ore.cost_ore, bp->robot_clay.cost_ore),bp->robot_obsidian.cost_ore),bp->robot_geode.cost_ore);
-        int max_required_clay = MAX(MAX(MAX(bp->robot_ore.cost_clay, bp->robot_clay.cost_clay),bp->robot_obsidian.cost_clay),bp->robot_geode.cost_clay);
-        int max_required_obsidian = MAX(MAX(MAX(bp->robot_ore.cost_obsidian, bp->robot_clay.cost_obsidian),bp->robot_obsidian.cost_obsidian),bp->robot_geode.cost_obsidian);
-        int max_required_total = max_required_ore + max_required_clay + max_required_obsidian;
-
-        float ideal_ratio_ore = max_required_ore / (float)max_required_total;
-        float ideal_ratio_clay = max_required_clay / (float)max_required_total;
-        float ideal_ratio_obsidian = max_required_obsidian / (float)max_required_total;
-
-        printf("totals needed: %02d, %02d, %02d\n", total_required_ore, total_required_clay, total_required_obsidian);
-        printf("maxes  needed: %02d, %02d, %02d\n", max_required_ore, max_required_clay, max_required_obsidian);
-        printf("ideal  ratios: %f, %f, %f\n", ideal_ratio_ore, ideal_ratio_clay, ideal_ratio_obsidian);
-
         // init
-        int count_ore = 0;
-        int count_clay = 0;
-        int count_obsidian = 0;
-        int count_geode = 0;
-
-        int count_ore_robot = 1;
-        int count_clay_robot = 0;
-        int count_obsidian_robot = 0;
-        int count_geode_robot = 0;
+        MineBackpack pack = {0};
+        pack.count_robot_ore = 1;
 
         // simulate
         int m = 24;
@@ -3259,131 +3294,142 @@ void day19(bool test)
                 break;
 
             // mine resources
-            count_ore      += count_ore_robot;
-            count_clay     += count_clay_robot;
-            count_obsidian += count_obsidian_robot;
-            count_geode    += count_geode_robot;
+            pack_gather_resources(&pack);
+
+            if(pack.build_ore || pack.build_clay || pack.build_obsidian || pack.build_geode)
+            {
+                if(pack.build_ore) pack.count_robot_ore++;
+                else if(pack.build_clay) pack.count_robot_clay++;
+                else if(pack.build_obsidian) pack.count_robot_obsidian++;
+                else if(pack.build_geode) pack.count_robot_geode++;
+
+                // reset build flags
+                pack.build_ore = false;
+                pack.build_clay = false;
+                pack.build_obsidian = false;
+                pack.build_geode = false;
+
+                --m;
+                continue;
+            }
 
             // check robot affordability
-            bool can_afford_ore_robot      = (bp->robot_ore.cost_ore <= count_ore);
-            bool can_afford_clay_robot     = (bp->robot_clay.cost_ore <= count_ore && count_clay_robot < bp->robot_obsidian.cost_clay);
-            bool can_afford_obsidian_robot = (bp->robot_obsidian.cost_ore <= count_ore && bp->robot_obsidian.cost_clay <= count_clay);
-            bool can_afford_geode_robot    = (bp->robot_geode.cost_ore <= count_ore && bp->robot_geode.cost_obsidian <= count_obsidian);
+            bool can_afford_ore_robot      = (bp->robot_ore.cost_ore <= pack.count_ore);
+            bool can_afford_clay_robot     = (bp->robot_clay.cost_ore <= pack.count_ore);
+            bool can_afford_obsidian_robot = (bp->robot_obsidian.cost_ore <= pack.count_ore && bp->robot_obsidian.cost_clay <= pack.count_clay);
+            bool can_afford_geode_robot    = (bp->robot_geode.cost_ore <= pack.count_ore && bp->robot_geode.cost_obsidian <= pack.count_obsidian);
 
-            printf("[%02d min] [Mined %d %d %d %d], [Robots %d,%d,%d,%d], [Afford? %d %d %d %d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot, can_afford_ore_robot, can_afford_clay_robot, can_afford_obsidian_robot, can_afford_geode_robot);
+            printf("[Minute %02d] [Mined %d %d %d %d], [Robots %d,%d,%d,%d], [Afford? %d %d %d %d]\n", 24-m+1, pack.count_ore, pack.count_clay, pack.count_obsidian, pack.count_geode,pack.count_robot_ore,pack.count_robot_clay, pack.count_robot_obsidian, pack.count_robot_geode, can_afford_ore_robot, can_afford_clay_robot, can_afford_obsidian_robot, can_afford_geode_robot);
 
-            bool build_ore = false;
-            bool build_clay = false;
-            bool build_obsidian = false;
-            bool build_geode = false;
-
-            // check robot costs
             if(can_afford_geode_robot)
             {
-                printf("Buying Geode Robot!\n");
                 // always buy a geode robot if you can afford it
-                count_ore  -= bp->robot_geode.cost_ore;
-                count_obsidian -= bp->robot_geode.cost_obsidian;
-                build_geode = true;
+                printf("Buying Geode Robot!\n");
+                pack.count_ore  -= bp->robot_geode.cost_ore;
+                pack.count_obsidian -= bp->robot_geode.cost_obsidian;
+                pack.build_geode = true;
             }
             else
             {
-                // pick target material
-                int target = 0;
+                // set target robot
+                Robot* target_robot;
 
-                if(count_clay_robot == 0)
+                if(pack.count_robot_clay == 0)
                 {
-                    target = TARGET_CLAY;
+                    target_robot = &bp->robot_clay;
+                    //printf("Target robot: Clay\n");
+                    if(can_afford_clay_robot)
+                    {
+                        printf("Buying Clay Robot\n");
+                        buy_robot(&pack, &bp->robot_clay, &pack.build_clay);
+                        continue;
+                    }
+                }
+                else if(pack.count_robot_obsidian == 0)
+                {
+                    target_robot = &bp->robot_obsidian;
+                    //printf("Target robot: Obsidian\n");
+                    if(can_afford_obsidian_robot)
+                    {
+                        printf("Buying Obsidian Robot\n");
+                        buy_robot(&pack, &bp->robot_obsidian, &pack.build_obsidian);
+                        continue;
+                    }
                 }
                 else
                 {
-                    int proj_output_ore = m * count_ore_robot + count_ore;
-                    int proj_output_clay = m * count_clay_robot + count_clay;
-                    int proj_output_obsidian = m * count_obsidian_robot + count_obsidian;
-                    int proj_output_total = proj_output_ore + proj_output_clay + proj_output_obsidian;
-
-                    float proj_ratio_ore = proj_output_ore / (float)proj_output_total;
-                    float proj_ratio_clay = proj_output_clay / (float)proj_output_total;
-                    float proj_ratio_obsidian = proj_output_obsidian / (float)proj_output_total;
-
-                    float diff_ratio_ore = ideal_ratio_ore - proj_ratio_ore;
-                    float diff_ratio_clay = ideal_ratio_clay - proj_ratio_clay;
-                    float diff_ratio_obsidian = ideal_ratio_obsidian - proj_ratio_obsidian;
-
-                    if(diff_ratio_ore > diff_ratio_clay && diff_ratio_ore > diff_ratio_obsidian)
-                    {
-                        target = TARGET_ORE;
-                    }
-                    else if(diff_ratio_clay > diff_ratio_ore && diff_ratio_clay > diff_ratio_obsidian)
-                    {
-                        target = TARGET_CLAY;
-                    }
-                    else
-                    {
-                        target = TARGET_OBSIDIAN;
-                    }
+                    target_robot = &bp->robot_geode;
                 }
 
-                if(target == TARGET_ORE)
+                // check options
+                if(can_afford_ore_robot || can_afford_clay_robot || can_afford_obsidian_robot)
                 {
-                    if(can_afford_ore_robot)
+                    MineBackpack test_pack = {0};
+                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
+
+                    int option_wait = time_to_get_required(&test_pack,target_robot,0);
+
+                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
+                    test_pack.count_robot_ore++;
+
+                    int option_ore = time_to_get_required(&test_pack,target_robot,1);
+
+                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
+                    test_pack.count_robot_clay++;
+
+                    int option_clay = time_to_get_required(&test_pack,target_robot,1);
+
+                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
+                    test_pack.count_robot_obsidian++;
+
+                    int option_obsidian = time_to_get_required(&test_pack,target_robot,1);
+
+                    int options[] = {option_wait, option_ore, option_clay, option_obsidian};
+
+                    //printf("options: %d, %d, %d, %d\n",options[0],options[1],options[2],options[3]);
+
+                    util_sort(options, 4);
+
+                    int winning_option = options[0];
+                    //printf("winning option: %d\n",winning_option);
+
+                    if(winning_option == option_wait)
                     {
-                        // Ore Robot
-                        printf("Buying Ore Robot!\n");
-                        count_ore -= bp->robot_ore.cost_ore;
-                        build_ore = true;
+                        //printf("Wait\n");
+                    }
+                    else if(winning_option == option_ore)
+                    {
+                        if(can_afford_ore_robot)
+                        {
+                            printf("Buying Ore Robot\n");
+                            buy_robot(&pack, &bp->robot_ore, &pack.build_ore);
+                        }
+                    }
+                    else if(winning_option == option_clay)
+                    {
+                        if(can_afford_clay_robot)
+                        {
+                            printf("Buying Clay Robot\n");
+                            buy_robot(&pack, &bp->robot_clay, &pack.build_clay);
+                        }
+                    }
+                    else if(winning_option == option_obsidian)
+                    {
+                        if(can_afford_obsidian_robot)
+                        {
+                            printf("Buying Obsidian Robot\n");
+                            buy_robot(&pack, &bp->robot_obsidian, &pack.build_obsidian);
+                        }
                     }
                 }
-                else if(target == TARGET_CLAY)
-                {
-                    if(can_afford_clay_robot)
-                    {
-                        // Clay Robot
-                        printf("Buying Clay Robot!\n");
-                        count_ore -= bp->robot_clay.cost_ore;
-                        build_clay = true;
-                    }
-                }
-                else if(target == TARGET_OBSIDIAN)
-                {
-                    if(can_afford_obsidian_robot)
-                    {
-                        // Obsidian Robot
-                        printf("Buying Obsidian Robot!\n");
-                        count_ore  -= bp->robot_obsidian.cost_ore;
-                        count_clay -= bp->robot_obsidian.cost_clay;
-                        build_obsidian = true;
-                    }
-                }
-            }
-
-            if(build_ore || build_clay || build_obsidian || build_geode)
-            {
-
-                // mine resources
-                count_ore      += count_ore_robot;
-                count_clay     += count_clay_robot;
-                count_obsidian += count_obsidian_robot;
-                count_geode    += count_geode_robot;
-
-                --m;
-
-                if(build_ore) count_ore_robot++;
-                else if(build_clay) count_clay_robot++;
-                else if(build_obsidian) count_obsidian_robot++;
-                else if(build_geode) count_geode_robot++;
-
-                printf("[%02d min] [Mined %d %d %d %d], [Robots %d,%d,%d,%d], [Afford? %d %d %d %d]\n", m, count_ore, count_clay, count_obsidian, count_geode,count_ore_robot,count_clay_robot, count_obsidian_robot, count_geode_robot, can_afford_ore_robot, can_afford_clay_robot, can_afford_obsidian_robot, can_afford_geode_robot);
             }
 
             --m;
         }
 
-        printf("Geode count: %d\n",count_geode);
+        printf("Geode count: %d\n",pack.count_geode);
 
     }
-
-    
 }
 
 typedef struct
