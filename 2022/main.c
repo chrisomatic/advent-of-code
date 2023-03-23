@@ -2411,6 +2411,7 @@ struct Valve
     int flow_rate;
     int tunnel_count;
     struct Valve* tunnels[8];
+    struct Valve* prev_tunnel;
     bool open;
     bool sim_open; // for projected simulation
 };
@@ -2420,8 +2421,8 @@ int evaluate_valve_route(Valve* v, int* total_flow_rate, int* minutes_left, int*
     //printf("->%s",v->name);
     if(!v->sim_open && open_the_valve)
     {
-        //printf("(open)");
         (*total_flow_rate) += (v->flow_rate * ((*minutes_left)-1));
+        //printf("m: %d, total_flow_rate: %d\n",*minutes_left, *total_flow_rate);
         v->sim_open = true;
         (*minutes_left)--;
     }
@@ -2439,11 +2440,11 @@ int evaluate_valve_route(Valve* v, int* total_flow_rate, int* minutes_left, int*
 
     for(int i = 0; i < v->tunnel_count; ++i)
     {
-        if(*depth == 1) printf("Testing valve %d (%s, flow_rate: %d)\n",i,v->tunnels[i]->name, v->tunnels[i]->flow_rate);
+        //if(*depth == 1) printf("Testing valve %d (%s, flow_rate: %d)\n",i,v->tunnels[i]->name, v->tunnels[i]->flow_rate);
 
         int test_rate1 = *total_flow_rate;
         int test_depth1 = *depth;
-        int test_minutes_left1 = (*minutes_left) - 1;
+        int test_minutes_left1 = (*minutes_left);
 
         evaluate_valve_route(v->tunnels[i],&test_rate1,&test_minutes_left1, &test_depth1, max_depth,false,NULL); // test not opening the valve
 
@@ -2457,7 +2458,7 @@ int evaluate_valve_route(Valve* v, int* total_flow_rate, int* minutes_left, int*
         if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
         {
             int test_depth2 = *depth;
-            int test_minutes_left2 = (*minutes_left) - 1;
+            int test_minutes_left2 = (*minutes_left);
 
             evaluate_valve_route(v->tunnels[i],&test_rate2,&test_minutes_left2, &test_depth2, max_depth,true,NULL); // test opening the valve
 
@@ -2466,17 +2467,18 @@ int evaluate_valve_route(Valve* v, int* total_flow_rate, int* minutes_left, int*
                 max_flow_rate = test_rate2;
                 winning_tunnel = i;
 
+                //printf("max_flow_rate (open): %d\n",max_flow_rate);
+
                 if(should_open)
                     *should_open = true;
             }
         }
 
-        if(v->tunnels[i]->sim_open != v->tunnels[i]->open)
-            v->tunnels[i]->sim_open = v->tunnels[i]->open; // reset the simulated open state
+        //if(v->tunnels[i]->sim_open != v->tunnels[i]->open)
+        v->tunnels[i]->sim_open = v->tunnels[i]->open; // reset the simulated open state
 
-        if(*depth == 1) printf("Rate (closed): %d, Rate (open): %d\n",test_rate1,test_rate2);
-        if(*depth == 1) util_wait_until_key_press();
-
+        //if(*depth == 1) printf("Rate (closed): %d, Rate (open): %d\n",test_rate1,test_rate2);
+        //if(*depth == 1) util_wait_until_key_press();
     }
 
     *total_flow_rate = max_flow_rate; // set total flow rate to max of children tunnels
@@ -2539,15 +2541,21 @@ void day16()
         memcpy(&valves[valve_count++],&v,sizeof(Valve));
     }
 
+    Valve* start_tunnel = 0;
+
     // fill out valve pointers
     for(int i = 0; i < valve_count; ++i)
     {
         Valve* v = &valves[i];
 
+        if(strcmp(v->name, "AA") == 0)
+            start_tunnel = v;
+
         for(int j = 0; j < v->tunnel_count; ++j)
         {
             char tunnel_name[3] = {0};
             memcpy(tunnel_name,v->tunnel_str+(3*j),2*sizeof(char));
+
 
             for(int k = 0; k < valve_count; ++k)
             {
@@ -2572,7 +2580,7 @@ void day16()
     {
         srand(seed++);
 
-        Valve* curr_valve = &valves[0];
+        Valve* curr_valve = start_tunnel; //&valves[0];
 
         int m = 30;
         int total_released_pressure = 0;
@@ -2603,7 +2611,7 @@ void day16()
 
             if(all_valves_open)
             {
-                if(debug)printf("[%d min left] All valves open. Waiting...\n",m);
+                if(debug) printf("[%d min left] All valves open. Waiting...\n",m);
                 --m;
                 continue;
             }
@@ -2614,6 +2622,7 @@ void day16()
                 if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m,curr_valve->name,curr_valve->flow_rate);
 
                 curr_valve->open = true;
+                curr_valve->sim_open = true;
                 total_released_pressure += (curr_valve->flow_rate*(m-1));
                 --m;
             }
@@ -2640,6 +2649,8 @@ void day16()
         }
     }
 
+    // 1873 -- too high
+    // 1750 -- too low
     printf("Total Released Pressure: %d\n",max_total_released_pressure);
 }
 
@@ -4679,12 +4690,136 @@ typedef struct
     char dir;
 } Blizzard;
 
-void day_24_print_grid(Blizzard* blizzards, int blizzard_count, PathPos* walls, int wall_count, int grid_width, int grid_height)
+typedef struct
+{
+    int x;
+    int y;
+    int t; // time
+    int d; // distance to goal
+    int v; // num visited
+} ExpeditionPos;
+
+#define EXPEDITION_ITEM_MAX 10000 
+
+typedef struct
+{
+    ExpeditionPos items[EXPEDITION_ITEM_MAX];
+    int item_count;
+    ExpeditionPos visited[3500];
+    int visited_count;
+} ExpeditionPosQueue;
+
+void print_queue(ExpeditionPosQueue* q)
+{
+    printf("Queue (%d)\n",q->item_count);
+
+    for(int i = 0; i < q->item_count; ++i)
+    {
+        ExpeditionPos* item = &q->items[i];
+        printf("  %d: (%d,%d,%d,%d) rank=%d\n",i,item->x,item->y,item->t,item->v,item->d+item->t+item->v);
+    }
+}
+
+bool expedition_pos_enqueue(ExpeditionPosQueue* q, int x, int y, int t, int d)
+{
+    // add to visited list
+    int v = 0;
+    bool visited = false;
+    for(int i = 0; i < q->visited_count; ++i)
+    {
+        if(q->visited[i].x == x && q->visited[i].y == y)
+        {
+            q->visited[i].v++; // times visited
+            v = q->visited[i].v;
+            visited = true;
+        }
+    }
+
+    if(!visited)
+    {
+        // add to visited list
+        q->visited[q->visited_count].x = x;
+        q->visited[q->visited_count].y = y;
+        q->visited[q->visited_count].v = 1;
+        v = 1;
+        q->visited_count++;
+    }
+
+    int index = -1;
+    int rank = d + t + v;
+
+    // find index to place new item
+    for(int i = 0; i < q->item_count; ++i)
+    {
+        int item_rank = q->items[i].d + q->items[i].t + q->items[i].v;
+        if(item_rank >= rank)
+        {
+            index = i;
+            break;
+        }
+    }
+
+    if(index == -1)
+    {
+        index = q->item_count == EXPEDITION_ITEM_MAX ? q->item_count-1 : q->item_count;
+    }
+
+    // shift
+    for(int i = q->item_count-1; i >= index; --i)
+    {
+        if(i == EXPEDITION_ITEM_MAX-1)
+            continue;
+
+        memcpy(&q->items[i+1],&q->items[i],sizeof(ExpeditionPos));
+    }
+
+    // insert new item
+    q->items[index].x = x;
+    q->items[index].y = y;
+    q->items[index].t = t;
+    q->items[index].d = d;
+    q->items[index].v = v;
+
+    if(q->item_count < EXPEDITION_ITEM_MAX)
+        q->item_count++;
+
+    //print_queue(q);
+    return true;
+}
+
+bool expedition_pos_dequeue(ExpeditionPosQueue* q, int* x, int* y, int* t)
+{
+    if(q->item_count == 0)
+        return false;
+
+    ExpeditionPos item;
+    memcpy(&item,&q->items[0],sizeof(ExpeditionPos));
+
+    for(int i = 0; i < q->item_count; ++i)
+    {
+        memcpy(&q->items[i],&q->items[i+1],sizeof(ExpeditionPos));
+    }
+    q->item_count--;
+
+    *x = item.x;
+    *y = item.y;
+    *t = item.t;
+
+    return true;
+}
+
+void day_24_print_grid(PathPos* player, Blizzard* blizzards, int blizzard_count, PathPos* walls, int wall_count, int grid_width, int grid_height)
 {
     for(int i = 0; i < grid_height; ++i)
     {
         for(int j = 0; j < grid_width; ++j)
         {
+            if(player->x == j && player->y == i)
+            {
+                printf("\e[33mE\e[0m");
+                continue;
+            }
+
             bool is_wall = false;
 
             for(int w = 0; w < wall_count; ++w)
@@ -4712,7 +4847,7 @@ void day_24_print_grid(Blizzard* blizzards, int blizzard_count, PathPos* walls, 
 
             if(blizzard_n > 0)
             {
-                printf("%c",blizzard_n == 1 ? blizzard_dir : '0' + blizzard_n);
+                printf("\e[34m%c\e[0m",blizzard_n == 1 ? blizzard_dir : '0' + blizzard_n);
                 continue;
             }
 
@@ -4720,6 +4855,55 @@ void day_24_print_grid(Blizzard* blizzards, int blizzard_count, PathPos* walls, 
         }
         printf("\n");
     }
+}
+
+void simulate_blizzard(Blizzard* blizzards, int blizzard_count,int grid_width, int grid_height, int steps)
+{
+    for(int s = 0; s < steps; ++s)
+    {
+        for(int i = 0; i < blizzard_count; ++i)
+        {
+            Blizzard* b = &blizzards[i];
+            switch(b->dir)
+            {
+                case '<': b->x--; break;
+                case '>': b->x++; break;
+                case '^': b->y--; break;
+                case 'v': b->y++; break;
+            }
+
+            if(b->x <= 0) b->x = grid_width - 2;
+            else if(b->x >= grid_width -1) b->x = 1;
+            if(b->y <= 0) b->y = grid_height - 2;
+            else if(b->y >= grid_height -1) b->y = 1;
+        }
+    }
+
+}
+
+bool blizzard_is_position_empty(int x, int y, int grid_width, int grid_height, Blizzard* blizzards, int blizzard_count, PathPos* walls, int wall_count)
+{
+    if(x < 0 || y < 0)
+        return false;
+
+    if(x >= grid_width || y >= grid_height)
+        return false;
+
+    for(int i = 0; i < wall_count; ++i)
+    {
+        PathPos* w = &walls[i];
+        if(w->x == x && w->y == y)
+            return false;
+    }
+
+    for(int i = 0; i < blizzard_count; ++i)
+    {
+        Blizzard* b = &blizzards[i];
+        if(b->x == x && b->y == y)
+            return false;
+    }
+
+    return true;
 }
 
 void day24(bool test)
@@ -4740,7 +4924,7 @@ void day24(bool test)
     int x = 0;
     int y = 0;
 
-    Blizzard blizzards[1000] = {0};
+    Blizzard blizzards[3600] = {0};
     int blizzard_count = 0;
 
     int grid_width = 0;
@@ -4797,35 +4981,121 @@ void day24(bool test)
 
     grid_height = y;
 
+    // set end spot
+    PathPos end = {grid_width-2, grid_height-1};
+
+    if(0) // used to swap end and start points
+    {
+        // swap end and start
+        PathPos temp = {start.x,start.y};
+
+        start.x = end.x;
+        start.y = end.y;
+
+        end.x = temp.x;
+        end.y = temp.y;
+    }
+
+    printf("Start [%d, %d] -> End [%d, %d]\n",start.x,start.y,end.x,end.y);
+
     printf("Grid Size: %d, %d\n",grid_width, grid_height);
 
-    day_24_print_grid(blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+    PathPos player = {start.x,start.y};
+
+    day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
     util_wait_until_key_press();
 
     // simulate blizzards
+    int t = 0; // time
+    //simulate_blizzard(blizzards,blizzard_count,grid_width,grid_height,260+239); // uncomment to simulate to a certain point at start
+
+    // snapshot blizzard initial state
+    Blizzard initial_blizzards[3600];
+    memcpy(initial_blizzards,blizzards, sizeof(Blizzard)*blizzard_count);
+
+    ExpeditionPosQueue queue = {0};
+
+    const int debug = 0;
+
+    int shortest_time = INT_MAX;
+
     for(;;)
     {
+        simulate_blizzard(blizzards,blizzard_count,grid_width,grid_height,1);
+        t++;
 
-        for(int i = 0; i < blizzard_count; ++i)
-        {
-            Blizzard* b = &blizzards[i];
-            switch(b->dir)
+        // check available positions to move
+        bool right_empty = blizzard_is_position_empty(player.x+1, player.y, grid_width, grid_height, blizzards, blizzard_count, walls, wall_count);
+        bool down_empty  = blizzard_is_position_empty(player.x, player.y+1, grid_width, grid_height, blizzards, blizzard_count, walls, wall_count);
+        bool up_empty    = blizzard_is_position_empty(player.x, player.y-1, grid_width, grid_height, blizzards, blizzard_count, walls, wall_count);
+        bool left_empty  = blizzard_is_position_empty(player.x-1, player.y, grid_width, grid_height, blizzards, blizzard_count, walls, wall_count);
+
+        int d1 = manhatten_dist(player.x+1,player.y,end.x,end.y);
+        int d2 = manhatten_dist(player.x,player.y+1,end.x,end.y);
+        int d3 = manhatten_dist(player.x,player.y-1,end.x,end.y);
+        int d4 = manhatten_dist(player.x-1,player.y,end.x,end.y);
+
+        if(right_empty && (t+d1 < shortest_time)) expedition_pos_enqueue(&queue, player.x+1, player.y,t,d1);
+        if(down_empty && (t+d2 < shortest_time))  expedition_pos_enqueue(&queue, player.x, player.y+1,t,d2);
+        if(up_empty && (t+d3 < shortest_time))    expedition_pos_enqueue(&queue, player.x, player.y-1,t,d3);
+        if(left_empty && (t+d4 < shortest_time))  expedition_pos_enqueue(&queue, player.x-1, player.y,t,d4);
+
+        // check to make sure waiting is an option and I don't get hit next frame
+        bool me_empty = blizzard_is_position_empty(player.x, player.y, grid_width, grid_height, blizzards, blizzard_count, walls, wall_count);
+
+        //if(!(up_empty || left_empty || right_empty || down_empty))
+        //{
+            if(me_empty) // && (player.x != start.x || player.y != start.y))
             {
-                case '<': b->x--; break;
-                case '>': b->x++; break;
-                case '^': b->y--; break;
-                case 'v': b->y++; break;
+                //printf("Adding wait option\n");
+                int d5 = manhatten_dist(player.x, player.y, end.x, end.y);
+                if(t+d5 < shortest_time)
+                    expedition_pos_enqueue(&queue, player.x, player.y,t,d5);
             }
+        //}
 
-            if(b->x <= 0) b->x = grid_width - 2;
-            else if(b->x >= grid_width -1) b->x = 1;
-            if(b->y <= 0) b->y = grid_height - 2;
-            else if(b->y >= grid_height -1) b->y = 1;
+        // make choice
+        bool r = expedition_pos_dequeue(&queue, &player.x, &player.y, &t);
+        if(!r)
+        {
+            printf("No where to go!\n");
+            break;
         }
 
-        day_24_print_grid(blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
-        util_wait_until_key_press();
+        //if(t % 100 == 0)
+        //{
+        //    printf("t: %d\n",t);
+        //}
+
+        //printf("player: %d, %d; t = %d. queue_size: %d, shortest_time: %d\n",player.x,player.y,t,queue.item_count,shortest_time);
+
+        memcpy(blizzards,initial_blizzards,sizeof(Blizzard)*blizzard_count);
+        simulate_blizzard(blizzards,blizzard_count,grid_width,grid_height,t);
+
+        if(debug)
+        {
+            printf("t: %d, lrudw: %d %d %d %d,%d\n", t, left_empty, right_empty, up_empty, down_empty, me_empty);
+            day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+            util_wait_until_key_press();
+        }
+
+        if(player.x == end.x && player.y == end.y)
+        {
+            printf("Made it!\n");
+            printf("x,y,t: %d, %d, %d\n",player.x, player.y, t);
+            day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+            if(t < shortest_time)
+                shortest_time = t;
+        }
     }
+
+    // part 1:
+    //   260
+    // part 2:
+    // 260 + 239 + 248
+    // = 747
+    printf("1) Shortest path: %d\n",shortest_time);
+
 }
 
 long UNSNAFU(char* s, int len)
@@ -4982,15 +5252,15 @@ int main(int argc, char* args[])
     day13();
     day14(1);
     day15(1);
-    //day16(); // in progress
-    day17();
-    day18(1);
-    day19(1); // in progress
+    day16(); // in progress
+    //day17();
+    //day18(1);
+    //day19(1); // in progress
     //day20(1);
     //day21(0);
     //day22(0);
     //day23(1);
-    //day24(1); // in progress
+    //day24(1);
     //day25(0);
 
     printf("\n======================================================\n");
