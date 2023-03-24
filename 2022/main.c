@@ -2407,85 +2407,81 @@ typedef struct Valve Valve;
 struct Valve
 {
     char name[3];
-    char tunnel_str[20];
+    char tunnel_str[20]; // for parsing
     int flow_rate;
     int tunnel_count;
     struct Valve* tunnels[8];
-    struct Valve* prev_tunnel;
     bool open;
     bool sim_open; // for projected simulation
 };
 
-int evaluate_valve_route(Valve* v, int* total_flow_rate, int* minutes_left, int* depth, const int max_depth, bool open_the_valve, bool* should_open)
+int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_depth, int* max_flow_rate,bool open_valve, bool prior_open_state)
 {
-    //printf("->%s",v->name);
-    if(!v->sim_open && open_the_valve)
+    if(v->flow_rate > 0 && !v->sim_open && open_valve)
     {
-        (*total_flow_rate) += (v->flow_rate * ((*minutes_left)-1));
-        //printf("m: %d, total_flow_rate: %d\n",*minutes_left, *total_flow_rate);
+        minutes_left--;
+        //printf("[m: %d] opening valve %s, max_flow_rate: %d -> %d!\n",minutes_left, v->name,*max_flow_rate, *max_flow_rate + (minutes_left*v->flow_rate));
+        *max_flow_rate += minutes_left*v->flow_rate;
         v->sim_open = true;
-        (*minutes_left)--;
     }
 
-    (*depth)++;
-    if(*depth >= max_depth || *minutes_left <= 0)
+    //printf("depth: %d, minutes: %d\n", depth, minutes_left);
+
+    depth++;
+    if(depth > max_depth || minutes_left <= 0)
     {
-        //printf("  Hit depth. Total flow rate: %d\n",*total_flow_rate);
-        return 0; // discarded
+        //printf("Hit max depth or out of minutes, depth: %d, minutes: %d!\n", depth, minutes_left);
+        v->sim_open = prior_open_state;
+        return 0;
     }
 
-    // dive into each tunnel
-    int winning_tunnel = 0;
-    int max_flow_rate = 0;
+    int best_tunnel = 0;
+    int best_tunnel_flow_rate = 0;
+    bool should_open_valve = false;
 
     for(int i = 0; i < v->tunnel_count; ++i)
     {
-        //if(*depth == 1) printf("Testing valve %d (%s, flow_rate: %d)\n",i,v->tunnels[i]->name, v->tunnels[i]->flow_rate);
+        int max_flow_rate_closed = *max_flow_rate;
+        int max_flow_rate_open   = *max_flow_rate;
 
-        int test_rate1 = *total_flow_rate;
-        int test_depth1 = *depth;
-        int test_minutes_left1 = (*minutes_left);
+        project_forward_into_tunnel(v->tunnels[i],minutes_left-1, depth, max_depth, &max_flow_rate_closed, false, v->tunnels[i]->sim_open);
 
-        evaluate_valve_route(v->tunnels[i],&test_rate1,&test_minutes_left1, &test_depth1, max_depth,false,NULL); // test not opening the valve
+        //if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
+        //{
+        //printf("[m: %d] Moving from %s -> %s [open: %d] \n",minutes_left, v->name,v->tunnels[i]->name, v->tunnels[i]->sim_open); 
+        project_forward_into_tunnel(v->tunnels[i],minutes_left-1, depth, max_depth, &max_flow_rate_open, true, v->tunnels[i]->sim_open);
+        //}
 
-        if(test_rate1 > max_flow_rate)
+        //printf("[m: %d] Diving into %s, max_flow (open): %d, (closed): %d\n",minutes_left,v->tunnels[i]->name, max_flow_rate_open, max_flow_rate_closed);
+        //util_wait_until_key_press();
+
+        if(max_flow_rate_closed > best_tunnel_flow_rate)
         {
-            max_flow_rate = test_rate1;
-            winning_tunnel = i;
+            best_tunnel_flow_rate = max_flow_rate_closed;
+            best_tunnel = i;
+            should_open_valve = false;
+        }
+        if(max_flow_rate_open > best_tunnel_flow_rate)
+        {
+            best_tunnel_flow_rate = max_flow_rate_open;
+            best_tunnel = i;
+            should_open_valve = true;
         }
 
-        int test_rate2 = *total_flow_rate;
-        if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
+        if(depth == 1) 
         {
-            int test_depth2 = *depth;
-            int test_minutes_left2 = (*minutes_left);
-
-            evaluate_valve_route(v->tunnels[i],&test_rate2,&test_minutes_left2, &test_depth2, max_depth,true,NULL); // test opening the valve
-
-            if(test_rate2 > max_flow_rate)
-            {
-                max_flow_rate = test_rate2;
-                winning_tunnel = i;
-
-                //printf("max_flow_rate (open): %d\n",max_flow_rate);
-
-                if(should_open)
-                    *should_open = true;
-            }
+            printf("Valve: %s->%s, Rate (closed): %d, Rate (open): %d\n",v->name,v->tunnels[i]->name, max_flow_rate_closed,max_flow_rate_open);
+            util_wait_until_key_press();
         }
-
-        //if(v->tunnels[i]->sim_open != v->tunnels[i]->open)
-        v->tunnels[i]->sim_open = v->tunnels[i]->open; // reset the simulated open state
-
-        //if(*depth == 1) printf("Rate (closed): %d, Rate (open): %d\n",test_rate1,test_rate2);
-        //if(*depth == 1) util_wait_until_key_press();
     }
 
-    *total_flow_rate = max_flow_rate; // set total flow rate to max of children tunnels
+    //printf("Valve %s, best tunnel: %s [max_flow: %d]\n",v->name, v->tunnels[best_tunnel]->name, best_tunnel_flow_rate);
 
-    //if(*depth == 1) printf("Winning tunnel: %d\n",winning_tunnel);
+    if(should_open_valve)
+        best_tunnel += 256; // encode open valve in return val
 
-    return winning_tunnel;
+    *max_flow_rate = best_tunnel_flow_rate;
+    return best_tunnel;
 }
 
 void day16()
@@ -2556,7 +2552,6 @@ void day16()
             char tunnel_name[3] = {0};
             memcpy(tunnel_name,v->tunnel_str+(3*j),2*sizeof(char));
 
-
             for(int k = 0; k < valve_count; ++k)
             {
                 if(strcmp(tunnel_name,valves[k].name) == 0)
@@ -2570,88 +2565,74 @@ void day16()
     // part 1
     // simulate
 
-    int max_total_released_pressure = 0;
     int debug = 1;
-    int seed = 1000;
 
-    const int num_loops = 1;
+    Valve* curr_valve = start_tunnel; //&valves[0];
 
-    for(int i = 0; i < num_loops; ++i)
+    int m = 30;
+    int total_released_pressure = 0;
+
+    // open all valves again
+    for(int j = 0; j < valve_count; ++j)
     {
-        srand(seed++);
+        valves[j].open = false;
+        valves[j].sim_open = false;
+    }
 
-        Valve* curr_valve = start_tunnel; //&valves[0];
+    bool open_next_valve = false;
 
-        int m = 30;
-        int total_released_pressure = 0;
+    for(;;)
+    {
+        if(m <= 0)
+            break;
 
-        // open all valves again
+        bool all_valves_open = true;
         for(int j = 0; j < valve_count; ++j)
         {
-            valves[j].open = false;
-            valves[j].sim_open = false;
-        }
-
-        bool open_valve = false;
-
-        for(;;)
-        {
-            if(m <= 0)
+            if(!valves[j].open && valves[j].flow_rate > 0)
+            {
+                all_valves_open = false;
                 break;
-
-            bool all_valves_open = true;
-            for(int j = 0; j < valve_count; ++j)
-            {
-                if(!valves[j].open && valves[j].flow_rate > 0)
-                {
-                    all_valves_open = false;
-                    break;
-                }
             }
-
-            if(all_valves_open)
-            {
-                if(debug) printf("[%d min left] All valves open. Waiting...\n",m);
-                --m;
-                continue;
-            }
-
-            if(curr_valve->flow_rate > 0 && !curr_valve->open && open_valve)
-            {
-                // open valve
-                if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m,curr_valve->name,curr_valve->flow_rate);
-
-                curr_valve->open = true;
-                curr_valve->sim_open = true;
-                total_released_pressure += (curr_valve->flow_rate*(m-1));
-                --m;
-            }
-            
-            // pick a tunnel to move to
-            int projected_flow_rate1 = 0;
-            int initial_depth = 0;
-            int minutes_left = m;
-
-            open_valve = false;
-            int chosen_tunnel = evaluate_valve_route(curr_valve, &projected_flow_rate1, &minutes_left, &initial_depth, 10,open_valve,&open_valve); // don't open valve
-
-            //int tunnel = rand() % (curr_valve->tunnel_count);
-            curr_valve = curr_valve->tunnels[chosen_tunnel];
-            if(debug) printf("[%d min left] Move to %s\n",m,curr_valve->name);
-            --m;
         }
 
-        if(debug) printf("total pressure: %d\n", total_released_pressure);
-
-        if(total_released_pressure > max_total_released_pressure)
+        if(all_valves_open)
         {
-            max_total_released_pressure = total_released_pressure;
+            if(debug) printf("[%d min left] All valves open. Waiting...\n",m);
+            --m;
+            continue;
         }
+
+        if(open_next_valve && curr_valve->flow_rate > 0 && !curr_valve->open)
+        {
+            // open valve
+            if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m,curr_valve->name,curr_valve->flow_rate);
+
+            curr_valve->open = true;
+            curr_valve->sim_open = true;
+            --m;
+            total_released_pressure += (curr_valve->flow_rate*m);
+        }
+        
+        // pick a tunnel to move to
+
+        int projected_flow_rate = 0;
+        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 3, &projected_flow_rate, false, curr_valve->open);
+        if(best_tunnel >= 256)
+        {
+            best_tunnel -= 256;
+            open_next_valve = true;
+        }
+
+        curr_valve = curr_valve->tunnels[best_tunnel];
+
+        if(debug) printf("[%d min left] Move to %s\n",m,curr_valve->name);
+        --m;
     }
 
     // 1873 -- too high
     // 1750 -- too low
-    printf("Total Released Pressure: %d\n",max_total_released_pressure);
+    printf("Total Released Pressure: %d\n",total_released_pressure);
 }
 
 #define BOARD_MAX_HEIGHT 100000
