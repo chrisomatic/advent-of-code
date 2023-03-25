@@ -2411,27 +2411,26 @@ struct Valve
     int flow_rate;
     int tunnel_count;
     struct Valve* tunnels[8];
+    int tunnel_lengths[8];
     bool open;
     bool sim_open; // for projected simulation
 };
 
-int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_depth, int* max_flow_rate,bool open_valve, bool prior_open_state)
+int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_depth, int* max_flow_rate,bool open_valve, Valve* prior_valve)
 {
-    if(v->flow_rate > 0 && !v->sim_open && open_valve)
+    if(v->flow_rate > 0 && !v->sim_open && minutes_left > 0 && open_valve)
     {
         minutes_left--;
-        //printf("[m: %d] opening valve %s, max_flow_rate: %d -> %d!\n",minutes_left, v->name,*max_flow_rate, *max_flow_rate + (minutes_left*v->flow_rate));
         *max_flow_rate += minutes_left*v->flow_rate;
+        //printf("[m: %d] opening valve %s, max_flow_rate: %d -> %d!\n",minutes_left, v->name,*max_flow_rate, *max_flow_rate);
         v->sim_open = true;
     }
 
     //printf("depth: %d, minutes: %d\n", depth, minutes_left);
 
-    depth++;
-    if(depth > max_depth || minutes_left <= 0)
+    if(depth >= max_depth || minutes_left <= 0)
     {
         //printf("Hit max depth or out of minutes, depth: %d, minutes: %d!\n", depth, minutes_left);
-        v->sim_open = prior_open_state;
         return 0;
     }
 
@@ -2441,18 +2440,26 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
 
     for(int i = 0; i < v->tunnel_count; ++i)
     {
+        if(v->tunnel_count > 1 && v->tunnels[i] == prior_valve)
+            continue; // ignore going backward in this case
+
         int max_flow_rate_closed = *max_flow_rate;
         int max_flow_rate_open   = *max_flow_rate;
 
-        project_forward_into_tunnel(v->tunnels[i],minutes_left-1, depth, max_depth, &max_flow_rate_closed, false, v->tunnels[i]->sim_open);
+        bool _prior_open_state = v->tunnels[i]->sim_open;
+
+        project_forward_into_tunnel(v->tunnels[i],minutes_left-v->tunnel_lengths[i], depth+1, max_depth, &max_flow_rate_closed, false, v);
+
+        v->tunnels[i]->sim_open = _prior_open_state;
 
         //if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
         //{
         //printf("[m: %d] Moving from %s -> %s [open: %d] \n",minutes_left, v->name,v->tunnels[i]->name, v->tunnels[i]->sim_open); 
-        project_forward_into_tunnel(v->tunnels[i],minutes_left-1, depth, max_depth, &max_flow_rate_open, true, v->tunnels[i]->sim_open);
+        project_forward_into_tunnel(v->tunnels[i],minutes_left-v->tunnel_lengths[i], depth+1, max_depth, &max_flow_rate_open, true, v);
         //}
+        v->tunnels[i]->sim_open = _prior_open_state;
 
-        //printf("[m: %d] Diving into %s, max_flow (open): %d, (closed): %d\n",minutes_left,v->tunnels[i]->name, max_flow_rate_open, max_flow_rate_closed);
+        //printf("[m: %d] Diving into %s (len: %d), max_flow (open): %d, (closed): %d\n",minutes_left,v->tunnels[i]->name, v->tunnel_lengths[i], max_flow_rate_open, max_flow_rate_closed);
         //util_wait_until_key_press();
 
         if(max_flow_rate_closed > best_tunnel_flow_rate)
@@ -2468,10 +2475,10 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
             should_open_valve = true;
         }
 
-        if(depth == 1) 
+        if(depth == 0) 
         {
-            printf("Valve: %s->%s, Rate (closed): %d, Rate (open): %d\n",v->name,v->tunnels[i]->name, max_flow_rate_closed,max_flow_rate_open);
-            util_wait_until_key_press();
+            //printf("Valve: %s->%s, Rate (closed): %d, Rate (open): %d\n",v->name,v->tunnels[i]->name, max_flow_rate_closed,max_flow_rate_open);
+            //util_wait_until_key_press();
         }
     }
 
@@ -2537,7 +2544,7 @@ void day16()
         memcpy(&valves[valve_count++],&v,sizeof(Valve));
     }
 
-    Valve* start_tunnel = 0;
+    Valve* start_valve = 0;
 
     // fill out valve pointers
     for(int i = 0; i < valve_count; ++i)
@@ -2545,29 +2552,87 @@ void day16()
         Valve* v = &valves[i];
 
         if(strcmp(v->name, "AA") == 0)
-            start_tunnel = v;
+            start_valve = v;
 
         for(int j = 0; j < v->tunnel_count; ++j)
         {
             char tunnel_name[3] = {0};
             memcpy(tunnel_name,v->tunnel_str+(3*j),2*sizeof(char));
 
+            v->tunnel_lengths[j] = 1; // initial length of tunnel
+
             for(int k = 0; k < valve_count; ++k)
             {
                 if(strcmp(tunnel_name,valves[k].name) == 0)
                 {
                     v->tunnels[j] = &valves[k];
+                    break;
                 }
             }
         }
     }
+
+    // reduce the graph
+# if 0
+    for(int i = 0; i < valve_count; ++i)
+    {
+        Valve* v = &valves[i];
+        if(v == start_valve)
+        {
+            continue; // don't remove starting valve
+        }
+
+        if(v->flow_rate == 0 && v->tunnel_count == 2)
+        {
+            // try to get rid of node
+            // connect a -> b, and increase tunnel length
+
+            Valve* a = v->tunnels[0];
+            Valve* b = v->tunnels[1];
+
+            for(int j = 0; j < a->tunnel_count; ++j)
+            {
+                if(strcmp(a->tunnels[j]->name,v->name) == 0)
+                {
+                    a->tunnels[j] = b;
+                    a->tunnel_lengths[j]++;
+                    break;
+                }
+            }
+
+            for(int j = 0; j < b->tunnel_count; ++j)
+            {
+                if(strcmp(b->tunnels[j]->name,v->name) == 0)
+                {
+                    b->tunnels[j] = a;
+                    b->tunnel_lengths[j]++;
+                    break;
+                }
+            }
+        }
+    }
+#endif
+
+    for(int i = 0; i < valve_count; ++i)
+    {
+        Valve* v = &valves[i];
+        printf("%s, flow: %d, (%d): ", v->name, v->flow_rate, v->tunnel_count);
+        for(int j = 0; j < v->tunnel_count; ++j)
+        {
+            printf("%s [len=%d]",v->tunnels[j]->name,v->tunnel_lengths[j]);
+            if(j < v->tunnel_count-1)
+                printf(", ");
+        }
+        printf("\n");
+    }
+
 
     // part 1
     // simulate
 
     int debug = 1;
 
-    Valve* curr_valve = start_tunnel; //&valves[0];
+    Valve* curr_valve = start_valve; //&valves[0];
 
     int m = 30;
     int total_released_pressure = 0;
@@ -2617,21 +2682,27 @@ void day16()
         // pick a tunnel to move to
 
         int projected_flow_rate = 0;
-        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 3, &projected_flow_rate, false, curr_valve->open);
+        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 18, &projected_flow_rate, false, NULL);
         if(best_tunnel >= 256)
         {
             best_tunnel -= 256;
             open_next_valve = true;
         }
 
+
+        m -= curr_valve->tunnel_lengths[best_tunnel];
         curr_valve = curr_valve->tunnels[best_tunnel];
 
         if(debug) printf("[%d min left] Move to %s\n",m,curr_valve->name);
-        --m;
     }
 
     // 1873 -- too high
     // 1750 -- too low
+    // 1752 -- wrong
+    // 1780 -- wrong
+    // 1778 -- wrong
+    // 1775 -- wrong
+    // 1772 -- wrong
     printf("Total Released Pressure: %d\n",total_released_pressure);
 }
 
