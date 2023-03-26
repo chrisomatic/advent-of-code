@@ -2484,8 +2484,11 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
 
     //printf("Valve %s, best tunnel: %s [max_flow: %d]\n",v->name, v->tunnels[best_tunnel]->name, best_tunnel_flow_rate);
 
-    if(should_open_valve)
+    if(depth == 0 && should_open_valve)
+    {
+        //printf("should open valve!\n");
         best_tunnel += 256; // encode open valve in return val
+    }
 
     *max_flow_rate = best_tunnel_flow_rate;
     return best_tunnel;
@@ -2495,7 +2498,7 @@ void day16()
 {
     util_print_day(16);
 
-    char* input_file = "inputs/16_test.txt";
+    char* input_file = "inputs/16.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -2573,7 +2576,6 @@ void day16()
     }
 
     // reduce the graph
-# if 0
     for(int i = 0; i < valve_count; ++i)
     {
         Valve* v = &valves[i];
@@ -2590,29 +2592,40 @@ void day16()
             Valve* a = v->tunnels[0];
             Valve* b = v->tunnels[1];
 
+            int a_index = -1;
             for(int j = 0; j < a->tunnel_count; ++j)
             {
                 if(strcmp(a->tunnels[j]->name,v->name) == 0)
                 {
-                    a->tunnels[j] = b;
-                    a->tunnel_lengths[j]++;
+                    a_index = j;
                     break;
                 }
             }
 
+            a->tunnels[a_index] = b;
+
+            int len_a = a->tunnel_lengths[a_index];
+
+            int b_index = -1;
             for(int j = 0; j < b->tunnel_count; ++j)
             {
                 if(strcmp(b->tunnels[j]->name,v->name) == 0)
                 {
-                    b->tunnels[j] = a;
-                    b->tunnel_lengths[j]++;
+                    b_index = j;
                     break;
                 }
             }
+
+            b->tunnels[b_index] = a;
+            int len_b = b->tunnel_lengths[b_index];
+
+            a->tunnel_lengths[a_index] = len_a + len_b;
+            b->tunnel_lengths[b_index] = len_a + len_b;
         }
     }
-#endif
 
+#if 0
+    // print reduced graph
     for(int i = 0; i < valve_count; ++i)
     {
         Valve* v = &valves[i];
@@ -2625,6 +2638,7 @@ void day16()
         }
         printf("\n");
     }
+#endif
 
 
     // part 1
@@ -2632,12 +2646,11 @@ void day16()
 
     int debug = 1;
 
-    Valve* curr_valve = start_valve; //&valves[0];
+    Valve* curr_valve = start_valve;
 
     int m = 30;
     int total_released_pressure = 0;
 
-    // open all valves again
     for(int j = 0; j < valve_count; ++j)
     {
         valves[j].open = false;
@@ -2679,10 +2692,12 @@ void day16()
             total_released_pressure += (curr_valve->flow_rate*m);
         }
         
+        open_next_valve = false;
+
         // pick a tunnel to move to
 
         int projected_flow_rate = 0;
-        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 18, &projected_flow_rate, false, NULL);
+        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 8, &projected_flow_rate, false, NULL);
         if(best_tunnel >= 256)
         {
             best_tunnel -= 256;
@@ -2698,12 +2713,85 @@ void day16()
 
     // 1873 -- too high
     // 1750 -- too low
-    // 1752 -- wrong
-    // 1780 -- wrong
-    // 1778 -- wrong
-    // 1775 -- wrong
-    // 1772 -- wrong
-    printf("Total Released Pressure: %d\n",total_released_pressure);
+
+    // 1767 -- right!
+    printf("1) Total Released Pressure: %d\n",total_released_pressure);
+
+
+    // part 2
+
+    Valve* curr_valve_a = start_valve;
+    Valve* curr_valve_b = start_valve;
+
+    int m_a = 26;
+    int m_b = 26;
+
+    total_released_pressure = 0;
+
+    for(int j = 0; j < valve_count; ++j)
+    {
+        valves[j].open = false;
+        valves[j].sim_open = false;
+    }
+
+    bool open_next_valve_a = false;
+    bool open_next_valve_b = false;
+
+    for(;;)
+    {
+        if(m_a <= 0 || m_b <= 0)
+            break;
+
+        bool all_valves_open = true;
+        for(int j = 0; j < valve_count; ++j)
+        {
+            if(!valves[j].open && valves[j].flow_rate > 0)
+            {
+                all_valves_open = false;
+                break;
+            }
+        }
+
+        if(all_valves_open)
+        {
+            if(debug) printf("[%d min left] All valves open. Waiting...\n",m_a);
+            --m_a;
+            --m_b;
+            continue;
+        }
+
+        if(open_next_valve_a && curr_valve_a->flow_rate > 0 && !curr_valve_a->open)
+        {
+            // open valve
+            if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m_a,curr_valve_a->name,curr_valve_a->flow_rate);
+
+            curr_valve_a->open = true;
+            curr_valve_a->sim_open = true;
+            --m_a;
+            total_released_pressure += (curr_valve_a->flow_rate*m_a);
+        }
+        
+        open_next_valve_a = false;
+
+        // pick a tunnel to move to
+
+        int projected_flow_rate = 0;
+        int best_tunnel = project_forward_into_tunnel(curr_valve_a, m_a, 0, 8, &projected_flow_rate, false, NULL);
+        if(best_tunnel >= 256)
+        {
+            best_tunnel -= 256;
+            open_next_valve_a = true;
+        }
+
+        m_a -= curr_valve_a->tunnel_lengths[best_tunnel];
+        curr_valve_a = curr_valve_a->tunnels[best_tunnel];
+
+        if(debug) printf("[%d min left] Move to %s\n",m_a,curr_valve_a->name);
+    }
+
+    printf("2) Total Released Pressure: %d\n",total_released_pressure);
+
+
 }
 
 #define BOARD_MAX_HEIGHT 100000
