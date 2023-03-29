@@ -21,13 +21,13 @@ https://adventofcode.com/
 | 13 - Distress Signal | :star: | :star: |
 | 14 - Regolith Reservoir | :star: | :star: |
 | 15 - Beacon Exclusion Zone | :star: | :star: |
-| 16 - Proboscidea Volcanium | | |
+| 16 - Proboscidea Volcanium | :star: | :star: |
 | 17 - Pyroclastic Flow | :star: | :star: |
 | 18 - Boiling Boulders | :star: | :star: |
-| 19 - Not Enough Materials | | |
+| 19 - Not Enough Materials | :star: | :star: |
 | 20 - Grove Positioning System | :star: | :star: |
 | 21 - Monkey Math | :star: | :star: |
 | 22 - Monkey Map | :star: | :star: |
 | 23 - Unstable Diffusion | :star: | :star: |
 | 24 - Blizzard Basin | :star: | :star: |
-| 25 - Full of Hot Air | :star: | |
+| 25 - Full of Hot Air | :star: | :star: |

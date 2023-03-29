@@ -2422,15 +2422,11 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
     {
         minutes_left--;
         *max_flow_rate += minutes_left*v->flow_rate;
-        //printf("[m: %d] opening valve %s, max_flow_rate: %d -> %d!\n",minutes_left, v->name,*max_flow_rate, *max_flow_rate);
         v->sim_open = true;
     }
 
-    //printf("depth: %d, minutes: %d\n", depth, minutes_left);
-
     if(depth >= max_depth || minutes_left <= 0)
     {
-        //printf("Hit max depth or out of minutes, depth: %d, minutes: %d!\n", depth, minutes_left);
         return 0;
     }
 
@@ -2445,22 +2441,16 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
 
         int max_flow_rate_closed = *max_flow_rate;
         int max_flow_rate_open   = *max_flow_rate;
-
         bool _prior_open_state = v->tunnels[i]->sim_open;
 
         project_forward_into_tunnel(v->tunnels[i],minutes_left-v->tunnel_lengths[i], depth+1, max_depth, &max_flow_rate_closed, false, v);
-
         v->tunnels[i]->sim_open = _prior_open_state;
 
-        //if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
-        //{
-        //printf("[m: %d] Moving from %s -> %s [open: %d] \n",minutes_left, v->name,v->tunnels[i]->name, v->tunnels[i]->sim_open); 
-        project_forward_into_tunnel(v->tunnels[i],minutes_left-v->tunnel_lengths[i], depth+1, max_depth, &max_flow_rate_open, true, v);
-        //}
-        v->tunnels[i]->sim_open = _prior_open_state;
-
-        //printf("[m: %d] Diving into %s (len: %d), max_flow (open): %d, (closed): %d\n",minutes_left,v->tunnels[i]->name, v->tunnel_lengths[i], max_flow_rate_open, max_flow_rate_closed);
-        //util_wait_until_key_press();
+        if(!v->tunnels[i]->sim_open && v->tunnels[i]->flow_rate > 0)
+        {
+            project_forward_into_tunnel(v->tunnels[i],minutes_left-v->tunnel_lengths[i], depth+1, max_depth, &max_flow_rate_open, true, v);
+            v->tunnels[i]->sim_open = _prior_open_state;
+        }
 
         if(max_flow_rate_closed > best_tunnel_flow_rate)
         {
@@ -2474,19 +2464,10 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
             best_tunnel = i;
             should_open_valve = true;
         }
-
-        if(depth == 0) 
-        {
-            //printf("Valve: %s->%s, Rate (closed): %d, Rate (open): %d\n",v->name,v->tunnels[i]->name, max_flow_rate_closed,max_flow_rate_open);
-            //util_wait_until_key_press();
-        }
     }
-
-    //printf("Valve %s, best tunnel: %s [max_flow: %d]\n",v->name, v->tunnels[best_tunnel]->name, best_tunnel_flow_rate);
 
     if(depth == 0 && should_open_valve)
     {
-        //printf("should open valve!\n");
         best_tunnel += 256; // encode open valve in return val
     }
 
@@ -2494,11 +2475,173 @@ int project_forward_into_tunnel(Valve* v, int minutes_left, int depth, int max_d
     return best_tunnel;
 }
 
-void day16()
+uint8_t project_forward_into_tunnel2(Valve* va, Valve* vb, int minutes_left, int depth, int max_depth, int* max_flow_rate, bool open_valve_a, bool open_valve_b, Valve* prior_valve_a, Valve* prior_valve_b)
+{
+    bool open_a = false;
+    bool open_b = false;
+
+    if(va->flow_rate > 0 && !va->sim_open && minutes_left > 0 && open_valve_a)
+    {
+        minutes_left--;
+        *max_flow_rate += minutes_left*va->flow_rate;
+        va->sim_open = true;
+        open_a = true;
+
+#if 0
+        for(int i = 0; i < depth; ++i)
+            printf("  ");
+        printf("[%d min] Opening Valve %s [total flow = %d]\n",minutes_left,va->name,*max_flow_rate);
+#endif
+    }
+
+    if(vb->flow_rate > 0 && !vb->sim_open && minutes_left > 0 && open_valve_b)
+    {
+        if(!open_a)
+            minutes_left--;
+        
+        *max_flow_rate += minutes_left*vb->flow_rate;
+        vb->sim_open = true;
+
+#if 0
+        for(int i = 0; i < depth; ++i)
+            printf("  ");
+        printf("[%d min] Opening Valve %s [total flow = %d]\n",minutes_left,vb->name,*max_flow_rate);
+#endif
+        open_b = true;
+    }
+
+    if(open_a && !open_b)
+    {
+        // move vb to next valve
+        vb = vb->tunnels[0];
+    }
+    else if(open_b && !open_a)
+    {
+        // move va to next valve
+        va = va->tunnels[0];
+    }
+
+    //util_wait_until_key_press();
+
+    if(depth >= max_depth || minutes_left <= 0)
+    {
+        return 0;
+    }
+
+    int best_tunnel_a = 0;
+    int best_tunnel_b = 0;
+
+    int best_tunnel_flow_rate = 0;
+    bool should_open_valve_a = false;
+    bool should_open_valve_b = false;
+
+    for(int i = 0; i < va->tunnel_count; ++i)
+    {
+        if(va->tunnel_count > 1 && va->tunnels[i] == prior_valve_a)
+            continue; // ignore going backward in this case
+
+        for(int j = 0; j < vb->tunnel_count; ++j)
+        {
+            if(vb->tunnel_count > 1 && vb->tunnels[j] == prior_valve_b)
+                continue; // ignore going backward in this case
+
+            int max_flow_rate_closed = *max_flow_rate;
+            int max_flow_rate_a_open = *max_flow_rate;
+            int max_flow_rate_b_open = *max_flow_rate;
+            int max_flow_rate_open   = *max_flow_rate;
+
+            bool _prior_open_state_a = va->tunnels[i]->sim_open;
+            bool _prior_open_state_b = vb->tunnels[j]->sim_open;
+
+            uint8_t b1,b2,b3,b4;
+
+            b1 = project_forward_into_tunnel2(va->tunnels[i],vb->tunnels[j], minutes_left-1, depth+1, max_depth, &max_flow_rate_closed, false,false, va,vb);
+            va->tunnels[i]->sim_open = _prior_open_state_a;
+            vb->tunnels[j]->sim_open = _prior_open_state_b;
+
+            if(!va->tunnels[i]->sim_open && va->tunnels[i]->flow_rate > 0)
+            {
+                b2 = project_forward_into_tunnel2(va->tunnels[i],vb->tunnels[j], minutes_left-1, depth+1, max_depth, &max_flow_rate_a_open, true, false, va,vb);
+                va->tunnels[i]->sim_open = _prior_open_state_a;
+                vb->tunnels[j]->sim_open = _prior_open_state_b;
+            }
+
+            if(!vb->tunnels[j]->sim_open && vb->tunnels[j]->flow_rate > 0)
+            {
+                b3 = project_forward_into_tunnel2(va->tunnels[i],vb->tunnels[j], minutes_left-1, depth+1, max_depth, &max_flow_rate_b_open, false,true, va,vb);
+                va->tunnels[i]->sim_open = _prior_open_state_a;
+                vb->tunnels[j]->sim_open = _prior_open_state_b;
+            }
+
+            if((!va->tunnels[i]->sim_open && va->tunnels[i]->flow_rate) > 0 && (!vb->tunnels[j]->sim_open && vb->tunnels[j]->flow_rate > 0))
+            {
+                b4 = project_forward_into_tunnel2(va->tunnels[i],vb->tunnels[j], minutes_left-1, depth+1, max_depth, &max_flow_rate_open, true, true,va,vb);
+                va->tunnels[i]->sim_open = _prior_open_state_a;
+                vb->tunnels[j]->sim_open = _prior_open_state_b;
+            }
+
+            if(max_flow_rate_closed > best_tunnel_flow_rate)
+            {
+                best_tunnel_flow_rate = max_flow_rate_closed;
+                best_tunnel_a = i;
+                best_tunnel_b = j;
+                should_open_valve_a = false;
+                should_open_valve_b = false;
+            }
+
+            if(max_flow_rate_a_open > best_tunnel_flow_rate)
+            {
+                best_tunnel_flow_rate = max_flow_rate_a_open;
+                best_tunnel_a = i;
+                best_tunnel_b = j;
+                should_open_valve_a = true;
+                should_open_valve_b = false;
+            }
+
+            if(max_flow_rate_b_open > best_tunnel_flow_rate)
+            {
+                best_tunnel_flow_rate = max_flow_rate_b_open;
+                best_tunnel_a = i;
+                best_tunnel_b = j;
+                should_open_valve_a = false;
+                should_open_valve_b = true;
+            }
+
+            if(max_flow_rate_open > best_tunnel_flow_rate)
+            {
+                best_tunnel_flow_rate = max_flow_rate_open;
+                best_tunnel_a = i;
+                best_tunnel_b = j;
+                should_open_valve_a = true;
+                should_open_valve_b = true;
+            }
+
+            if(depth == 0)
+            {
+                //printf("tunnels: %s %s. [00: %d, 10: %d, 01: %d, 11: %d], winning: %d [%d%d]\n",va->tunnels[i]->name,vb->tunnels[j]->name,max_flow_rate_closed,max_flow_rate_a_open,max_flow_rate_b_open,max_flow_rate_open,best_tunnel_flow_rate, should_open_valve_a,should_open_valve_b);
+            }
+
+        }
+    }
+
+    uint8_t best_tunnel = ((should_open_valve_a ? 1 : 0) << 7) | ((should_open_valve_b ? 1 : 0) << 6) | ((best_tunnel_a & 0b00000111) << 3) | (best_tunnel_b & 0b00000111);
+    if(depth == 0)
+    {
+        //printf("best_tunnel: %02X, open_a: %d, open_b: %d, best_tunnel_a: %d, best_tunnel_b: %d\n",best_tunnel, should_open_valve_a, should_open_valve_b, best_tunnel_a, best_tunnel_b);
+        //util_wait_until_key_press();
+    }
+
+    *max_flow_rate = best_tunnel_flow_rate;
+    return best_tunnel;
+}
+
+void day16(int test)
 {
     util_print_day(16);
 
-    char* input_file = "inputs/16.txt";
+    if(test) printf("**TEST FILE**\n\n");
+
+    char* input_file = test ? "inputs/16_test.txt" : "inputs/16.txt";
     FILE* fp = fopen(input_file, "r");
 
     if(!fp)
@@ -2576,6 +2719,7 @@ void day16()
     }
 
     // reduce the graph
+#if 0
     for(int i = 0; i < valve_count; ++i)
     {
         Valve* v = &valves[i];
@@ -2624,7 +2768,6 @@ void day16()
         }
     }
 
-#if 0
     // print reduced graph
     for(int i = 0; i < valve_count; ++i)
     {
@@ -2644,7 +2787,7 @@ void day16()
     // part 1
     // simulate
 
-    int debug = 1;
+    int debug = 0;
 
     Valve* curr_valve = start_valve;
 
@@ -2697,7 +2840,7 @@ void day16()
         // pick a tunnel to move to
 
         int projected_flow_rate = 0;
-        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 8, &projected_flow_rate, false, NULL);
+        int best_tunnel = project_forward_into_tunnel(curr_valve, m, 0, 18, &projected_flow_rate, false, NULL);
         if(best_tunnel >= 256)
         {
             best_tunnel -= 256;
@@ -2717,14 +2860,12 @@ void day16()
     // 1767 -- right!
     printf("1) Total Released Pressure: %d\n",total_released_pressure);
 
-
     // part 2
-
+#if 1
     Valve* curr_valve_a = start_valve;
     Valve* curr_valve_b = start_valve;
 
     int m_a = 26;
-    int m_b = 26;
 
     total_released_pressure = 0;
 
@@ -2739,7 +2880,7 @@ void day16()
 
     for(;;)
     {
-        if(m_a <= 0 || m_b <= 0)
+        if(m_a <= 0)
             break;
 
         bool all_valves_open = true;
@@ -2756,19 +2897,34 @@ void day16()
         {
             if(debug) printf("[%d min left] All valves open. Waiting...\n",m_a);
             --m_a;
-            --m_b;
             continue;
         }
+
+        bool open_a = false;
 
         if(open_next_valve_a && curr_valve_a->flow_rate > 0 && !curr_valve_a->open)
         {
             // open valve
+            --m_a;
             if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m_a,curr_valve_a->name,curr_valve_a->flow_rate);
 
             curr_valve_a->open = true;
             curr_valve_a->sim_open = true;
-            --m_a;
             total_released_pressure += (curr_valve_a->flow_rate*m_a);
+            open_a = true;
+        }
+
+        if(open_next_valve_b && curr_valve_b->flow_rate > 0 && !curr_valve_b->open)
+        {
+            if(!open_a)
+                --m_a;
+
+            // open valve
+            if(debug) printf("[%d min left] Open %s (flow rate: %d)\n",m_a,curr_valve_b->name,curr_valve_b->flow_rate);
+
+            curr_valve_b->open = true;
+            curr_valve_b->sim_open = true;
+            total_released_pressure += (curr_valve_b->flow_rate*m_a);
         }
         
         open_next_valve_a = false;
@@ -2776,20 +2932,38 @@ void day16()
         // pick a tunnel to move to
 
         int projected_flow_rate = 0;
-        int best_tunnel = project_forward_into_tunnel(curr_valve_a, m_a, 0, 8, &projected_flow_rate, false, NULL);
-        if(best_tunnel >= 256)
-        {
-            best_tunnel -= 256;
-            open_next_valve_a = true;
-        }
+        uint8_t best_tunnel = project_forward_into_tunnel2(curr_valve_a, curr_valve_b, m_a, 0, 2, &projected_flow_rate, false,false, NULL,NULL);
 
-        m_a -= curr_valve_a->tunnel_lengths[best_tunnel];
-        curr_valve_a = curr_valve_a->tunnels[best_tunnel];
+        uint8_t best_tunnel_a = (best_tunnel >> 3) & 0b00000111;
+        uint8_t best_tunnel_b = (best_tunnel) & 0b00000111;
 
-        if(debug) printf("[%d min left] Move to %s\n",m_a,curr_valve_a->name);
+        open_next_valve_a = ((best_tunnel >> 7) & 0x1) == 1;
+        open_next_valve_b = ((best_tunnel >> 6) & 0x1) == 1;
+
+        //printf("Result: %d %d, %d %d\n",open_next_valve_a, open_next_valve_b, best_tunnel_a, best_tunnel_b);
+
+        m_a -= 1; //curr_valve_a->tunnel_lengths[best_tunnel];
+        curr_valve_a = curr_valve_a->tunnels[best_tunnel_a];
+        curr_valve_b = curr_valve_b->tunnels[best_tunnel_b];
+
+        if(debug) printf("[%d min left] I move to %s, Elephant moves to %s\n",m_a,curr_valve_a->name,curr_valve_b->name);
     }
 
+    // 2600 -- too high
+    // 2551 -- wrong
+    // 2549 -- wrong
+    // 2547 -- wrong
+    // 2545 -- wrong
+    // 2543 -- wrong
+    // 2541 -- wrong
+    // 2539 -- wrong
+    // 2537 -- wrong
+    // 2535 -- wrong
+    // 2533 -- wrong
+    // 2500 -- too low
+    // 2453 -- too low
     printf("2) Total Released Pressure: %d\n",total_released_pressure);
+#endif
 
 
 }
@@ -3320,72 +3494,93 @@ typedef struct
     Robot robot_clay;
     Robot robot_obsidian;
     Robot robot_geode;
+    int max_ore;
+    int max_clay;
+    int max_obsidian;
 } Blueprint;
 
-enum MaterialTarget
+int simulate_resource_gathering(Blueprint* bp, int minutes_left, int ore, int clay, int obsidian, int geode, int ore_robots, int clay_robots, int obsidian_robots, int geode_robots, bool build_ore, bool build_clay, bool build_obsidian, bool build_geode)
 {
-    TARGET_ORE,
-    TARGET_CLAY,
-    TARGET_OBSIDIAN,
-    TARGET_GEODE,
-};
 
-typedef struct
-{
-    int count_ore;
-    int count_clay;
-    int count_obsidian;
-    int count_geode;
+    // mine resources
+    ore      += ore_robots;
+    clay     += clay_robots;
+    obsidian += obsidian_robots;
+    geode    += geode_robots;
 
-    int count_robot_ore;
-    int count_robot_clay;
-    int count_robot_obsidian;
-    int count_robot_geode;
-
-    bool build_ore;
-    bool build_clay;
-    bool build_obsidian;
-    bool build_geode;
-
-} MineBackpack;
-
-void pack_gather_resources(MineBackpack* pack)
-{
-    pack->count_ore      += pack->count_robot_ore;
-    pack->count_clay     += pack->count_robot_clay;
-    pack->count_obsidian += pack->count_robot_obsidian;
-    pack->count_geode    += pack->count_robot_geode;
-}
-
-int time_to_get_required(MineBackpack* pack, Robot* robot, int m)
-{
-    for(int i = m; i <= 300; ++i)
+    minutes_left--;
+    if(minutes_left <= 0)
+        return geode;
+    
+    // build robots
+    if(build_ore)
     {
-        //printf("i: %d\n",i);
-        pack_gather_resources(pack);
-
-        //printf("ore count: %d\n",pack->count_ore);
-
-        bool got_ore = (pack->count_ore >= robot->cost_ore);
-        bool got_clay = (pack->count_clay >= robot->cost_clay);
-        bool got_obsidian = (pack->count_obsidian >= robot->cost_obsidian);
-
-        if(got_ore && got_clay && got_obsidian)
-        {
-            //printf("satisifed\n");
-            return i;
-        }
+        ore_robots++;
+        ore -= bp->robot_ore.cost_ore;
+    }
+    else if(build_clay)
+    {
+        clay_robots++;
+        ore -= bp->robot_clay.cost_ore;
+    }
+    else if(build_obsidian)
+    {
+        obsidian_robots++;
+        ore -= bp->robot_obsidian.cost_ore;
+        clay -= bp->robot_obsidian.cost_clay;
+    }
+    else if(build_geode)
+    {
+        geode_robots++;
+        ore -= bp->robot_geode.cost_ore;
+        obsidian -= bp->robot_geode.cost_obsidian;
     }
 
-    return 300;
-}
+    // check robot affordability
+    bool can_afford_ore_robot      = (bp->robot_ore.cost_ore <= ore);
+    bool can_afford_clay_robot     = (bp->robot_clay.cost_ore <= ore);
+    bool can_afford_obsidian_robot = (bp->robot_obsidian.cost_ore <= ore && bp->robot_obsidian.cost_clay <= clay);
+    bool can_afford_geode_robot    = (bp->robot_geode.cost_ore <= ore && bp->robot_geode.cost_obsidian <= obsidian);
 
-void buy_robot(MineBackpack* pack, Robot* robot, bool* build_flag)
-{
-    pack->count_ore -= robot->cost_ore;
-    pack->count_clay -= robot->cost_clay;
-    pack->count_obsidian -= robot->cost_obsidian;
-    *build_flag = true;
+    if(can_afford_geode_robot)
+    {
+        return simulate_resource_gathering(bp, minutes_left, ore, clay, obsidian, geode, ore_robots, clay_robots, obsidian_robots, geode_robots,false,false,false,true);
+    }
+
+    int g1 = -1;
+    int g2 = -1;
+    int g3 = -1;
+    int g4 = -1;
+
+    // sit and gather resources
+    g1 = simulate_resource_gathering(bp, minutes_left, ore, clay, obsidian, geode, ore_robots, clay_robots, obsidian_robots, geode_robots,false,false,false,false);
+
+    if(can_afford_ore_robot && ore_robots < bp->max_ore)
+    {
+        g2 = simulate_resource_gathering(bp, minutes_left, ore, clay, obsidian, geode, ore_robots, clay_robots, obsidian_robots, geode_robots,true,false,false,false);
+    }
+
+    if(can_afford_clay_robot && clay_robots < bp->max_clay)
+    {
+        g3 = simulate_resource_gathering(bp, minutes_left, ore, clay, obsidian, geode, ore_robots, clay_robots, obsidian_robots, geode_robots,false,true,false,false);
+    }
+
+    if(can_afford_obsidian_robot && obsidian_robots < bp->max_obsidian)
+    {
+        g4 = simulate_resource_gathering(bp, minutes_left, ore, clay, obsidian, geode, ore_robots, clay_robots, obsidian_robots, geode_robots,false,false,true,false);
+    }
+
+
+    int g[] = {g1, g2, g3, g4};
+    //if(minutes_left == 23)
+    //{
+        //printf("Resources: %d %d %d %d\n",ore,clay,obsidian,geode);
+        //printf("g: [%d, %d, %d, %d, %d]\n",g0,g1,g2,g3,g4);
+    //}
+
+    util_sort_desc(g,4);
+
+    return g[0];
 }
 
 void day19(bool test)
@@ -3419,7 +3614,18 @@ void day19(bool test)
         blueprint_count++;
     }
 
-    printf("Num Blueprints: %d\n",blueprint_count);
+    //printf("Num Blueprints: %d\n",blueprint_count);
+
+    for(int i = 0; i < blueprint_count; ++i)
+    {
+        Blueprint* bp = &blueprints[i];
+
+        bp->max_ore      = MAX(MAX(MAX(bp->robot_ore.cost_ore,bp->robot_clay.cost_ore),bp->robot_obsidian.cost_ore),bp->robot_geode.cost_ore);
+        bp->max_clay     = MAX(MAX(MAX(bp->robot_ore.cost_clay,bp->robot_clay.cost_clay),bp->robot_obsidian.cost_clay),bp->robot_geode.cost_clay);
+        bp->max_obsidian = MAX(MAX(MAX(bp->robot_ore.cost_obsidian,bp->robot_clay.cost_obsidian),bp->robot_obsidian.cost_obsidian),bp->robot_geode.cost_obsidian);
+    }
+
+    int total_quality_number = 0;
 
     for(int i = 0; i < blueprint_count; ++i)
     {
@@ -3432,155 +3638,39 @@ void day19(bool test)
         printf("  Geode Robot Cost:    [%02d %02d %02d]\n", bp->robot_geode.cost_ore, bp->robot_geode.cost_clay, bp->robot_geode.cost_obsidian);
         printf("=================================\n");
 
-        // init
-        MineBackpack pack = {0};
-        pack.count_robot_ore = 1;
-
-        // simulate
-        int m = 24;
-
-        for(;;)
-        {
-            if(m <= 0)
-                break;
-
-            // mine resources
-            pack_gather_resources(&pack);
-
-            if(pack.build_ore || pack.build_clay || pack.build_obsidian || pack.build_geode)
-            {
-                if(pack.build_ore) pack.count_robot_ore++;
-                else if(pack.build_clay) pack.count_robot_clay++;
-                else if(pack.build_obsidian) pack.count_robot_obsidian++;
-                else if(pack.build_geode) pack.count_robot_geode++;
-
-                // reset build flags
-                pack.build_ore = false;
-                pack.build_clay = false;
-                pack.build_obsidian = false;
-                pack.build_geode = false;
-
-                --m;
-                continue;
-            }
-
-            // check robot affordability
-            bool can_afford_ore_robot      = (bp->robot_ore.cost_ore <= pack.count_ore);
-            bool can_afford_clay_robot     = (bp->robot_clay.cost_ore <= pack.count_ore);
-            bool can_afford_obsidian_robot = (bp->robot_obsidian.cost_ore <= pack.count_ore && bp->robot_obsidian.cost_clay <= pack.count_clay);
-            bool can_afford_geode_robot    = (bp->robot_geode.cost_ore <= pack.count_ore && bp->robot_geode.cost_obsidian <= pack.count_obsidian);
-
-            printf("[Minute %02d] [Mined %d %d %d %d], [Robots %d,%d,%d,%d], [Afford? %d %d %d %d]\n", 24-m+1, pack.count_ore, pack.count_clay, pack.count_obsidian, pack.count_geode,pack.count_robot_ore,pack.count_robot_clay, pack.count_robot_obsidian, pack.count_robot_geode, can_afford_ore_robot, can_afford_clay_robot, can_afford_obsidian_robot, can_afford_geode_robot);
-
-            if(can_afford_geode_robot)
-            {
-                // always buy a geode robot if you can afford it
-                printf("Buying Geode Robot!\n");
-                pack.count_ore  -= bp->robot_geode.cost_ore;
-                pack.count_obsidian -= bp->robot_geode.cost_obsidian;
-                pack.build_geode = true;
-            }
-            else
-            {
-                // set target robot
-                Robot* target_robot;
-
-                if(pack.count_robot_clay == 0)
-                {
-                    target_robot = &bp->robot_clay;
-                    //printf("Target robot: Clay\n");
-                    if(can_afford_clay_robot)
-                    {
-                        printf("Buying Clay Robot\n");
-                        buy_robot(&pack, &bp->robot_clay, &pack.build_clay);
-                        continue;
-                    }
-                }
-                else if(pack.count_robot_obsidian == 0)
-                {
-                    target_robot = &bp->robot_obsidian;
-                    //printf("Target robot: Obsidian\n");
-                    if(can_afford_obsidian_robot)
-                    {
-                        printf("Buying Obsidian Robot\n");
-                        buy_robot(&pack, &bp->robot_obsidian, &pack.build_obsidian);
-                        continue;
-                    }
-                }
-                else
-                {
-                    target_robot = &bp->robot_geode;
-                }
-
-                // check options
-                if(can_afford_ore_robot || can_afford_clay_robot || can_afford_obsidian_robot)
-                {
-                    MineBackpack test_pack = {0};
-                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
-
-                    int option_wait = time_to_get_required(&test_pack,target_robot,0);
-
-                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
-                    test_pack.count_robot_ore++;
-
-                    int option_ore = time_to_get_required(&test_pack,target_robot,1);
-
-                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
-                    test_pack.count_robot_clay++;
-
-                    int option_clay = time_to_get_required(&test_pack,target_robot,1);
-
-                    memcpy(&test_pack,&pack,sizeof(MineBackpack));
-                    test_pack.count_robot_obsidian++;
-
-                    int option_obsidian = time_to_get_required(&test_pack,target_robot,1);
-
-                    int options[] = {option_wait, option_ore, option_clay, option_obsidian};
-
-                    //printf("options: %d, %d, %d, %d\n",options[0],options[1],options[2],options[3]);
-
-                    util_sort(options, 4);
-
-                    int winning_option = options[0];
-                    //printf("winning option: %d\n",winning_option);
-
-                    if(winning_option == option_wait)
-                    {
-                        //printf("Wait\n");
-                    }
-                    else if(winning_option == option_ore)
-                    {
-                        if(can_afford_ore_robot)
-                        {
-                            printf("Buying Ore Robot\n");
-                            buy_robot(&pack, &bp->robot_ore, &pack.build_ore);
-                        }
-                    }
-                    else if(winning_option == option_clay)
-                    {
-                        if(can_afford_clay_robot)
-                        {
-                            printf("Buying Clay Robot\n");
-                            buy_robot(&pack, &bp->robot_clay, &pack.build_clay);
-                        }
-                    }
-                    else if(winning_option == option_obsidian)
-                    {
-                        if(can_afford_obsidian_robot)
-                        {
-                            printf("Buying Obsidian Robot\n");
-                            buy_robot(&pack, &bp->robot_obsidian, &pack.build_obsidian);
-                        }
-                    }
-                }
-            }
-
-            --m;
-        }
-
-        printf("Geode count: %d\n",pack.count_geode);
-
+        int g = simulate_resource_gathering(bp, 24, 0, 0, 0, 0, 1, 0, 0, 0,false,false,false,false);
+        printf("Geode count: %d\n",g);
+        int quality_number = g*bp->id;
+        total_quality_number += quality_number;
     }
+
+    // 1315 -- too low
+    // 2160 -- right
+    printf("1) Total Quality Number: %d\n",total_quality_number);
+
+    blueprint_count = 3;
+    int geode_number = 1;
+
+    for(int i = 0; i < blueprint_count; ++i)
+    {
+        Blueprint* bp = &blueprints[i];
+
+        printf("\n========= Blueprint %d ==========\n",bp->id);
+        printf("  Ore Robot Cost:      [%02d %02d %02d]\n", bp->robot_ore.cost_ore, bp->robot_ore.cost_clay, bp->robot_ore.cost_obsidian);
+        printf("  Clay Robot Cost:     [%02d %02d %02d]\n", bp->robot_clay.cost_ore, bp->robot_clay.cost_clay, bp->robot_clay.cost_obsidian);
+        printf("  Obsidian Robot Cost: [%02d %02d %02d]\n", bp->robot_obsidian.cost_ore, bp->robot_obsidian.cost_clay, bp->robot_obsidian.cost_obsidian);
+        printf("  Geode Robot Cost:    [%02d %02d %02d]\n", bp->robot_geode.cost_ore, bp->robot_geode.cost_clay, bp->robot_geode.cost_obsidian);
+        printf("=================================\n");
+
+        int g = simulate_resource_gathering(bp, 32, 0, 0, 0, 0, 1, 0, 0, 0,false,false,false,false);
+        printf("Geode count: %d\n",g);
+        geode_number *= g;
+    }
+
+    // 58, 10, 23
+    // 13340
+    printf("2) Geode Number: %d\n",geode_number);
+
 }
 
 typedef struct
@@ -5136,14 +5226,13 @@ void day24(bool test)
         end.y = temp.y;
     }
 
-    printf("Start [%d, %d] -> End [%d, %d]\n",start.x,start.y,end.x,end.y);
-
-    printf("Grid Size: %d, %d\n",grid_width, grid_height);
+    //printf("Start [%d, %d] -> End [%d, %d]\n",start.x,start.y,end.x,end.y);
+    //printf("Grid Size: %d, %d\n",grid_width, grid_height);
 
     PathPos player = {start.x,start.y};
 
-    day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
-    util_wait_until_key_press();
+    //day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+    //util_wait_until_key_press();
 
     // simulate blizzards
     int t = 0; // time
@@ -5198,7 +5287,7 @@ void day24(bool test)
         bool r = expedition_pos_dequeue(&queue, &player.x, &player.y, &t);
         if(!r)
         {
-            printf("No where to go!\n");
+            //printf("No where to go!\n");
             break;
         }
 
@@ -5221,9 +5310,9 @@ void day24(bool test)
 
         if(player.x == end.x && player.y == end.y)
         {
-            printf("Made it!\n");
-            printf("x,y,t: %d, %d, %d\n",player.x, player.y, t);
-            day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
+            //printf("Made it!\n");
+            //printf("x,y,t: %d, %d, %d\n",player.x, player.y, t);
+            //day_24_print_grid(&player, blizzards, blizzard_count, walls, wall_count, grid_width, grid_height);
             if(t < shortest_time)
                 shortest_time = t;
         }
@@ -5371,6 +5460,8 @@ void day25(bool test)
 
     char* snafu_number = SNAFU(sum);
     printf("1) SNAFU: %s\n",snafu_number);
+
+    printf("2) Woohoo!\n");
 }
 
 int main(int argc, char* args[])
@@ -5392,16 +5483,16 @@ int main(int argc, char* args[])
     day13();
     day14(1);
     day15(1);
-    day16(); // in progress
-    //day17();
-    //day18(1);
-    //day19(1); // in progress
-    //day20(1);
-    //day21(0);
-    //day22(0);
-    //day23(1);
-    //day24(1);
-    //day25(0);
+    day16(1); // in progress
+    day17();
+    day18(1);
+    //day19(0); // run time
+    day20(1);
+    day21(0);
+    day22(0);
+    day23(1);
+    day24(1);
+    day25(0);
 
     printf("\n======================================================\n");
     return 0;
