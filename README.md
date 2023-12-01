@@ -2,6 +2,12 @@
 
 https://adventofcode.com/
 
+## 2023
+
+| Day        | Part 1        | Part 2  |
+| -----------|:-------------:|:-------:|
+| 1 - Trebuchet?! | :star: | :star: |
+
 ## 2022
 
 | Day        | Part 1        | Part 2  |
