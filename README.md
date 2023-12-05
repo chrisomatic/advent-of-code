@@ -7,6 +7,8 @@ https://adventofcode.com/
 | Day        | Part 1        | Part 2  |
 | -----------|:-------------:|:-------:|
 | 1 - Trebuchet?! | :star: | :star: |
+| 2 - Cube Conundrum | :star: | :star: |
+| 3 - Gear Ratios | :star: | :star: |
 
 ## 2022
 

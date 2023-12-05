@@ -6,6 +6,11 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define ABS(x) ((x) < 0 ? -1*(x) : (x))
 
+// strings
+#define STR_EMPTY(x)      (x == 0 || strlen(x) == 0)
+#define STR_EQUAL(x,y)    (strncmp((x),(y),strlen((x))) == 0 && strlen(x) == strlen(y))
+#define STRN_EQUAL(x,y,n) (strncmp((x),(y),(n)) == 0)
+
 typedef struct
 {
     int x,y;
