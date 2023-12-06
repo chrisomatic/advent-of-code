@@ -596,6 +596,115 @@ void day3()
 
 }
 
+typedef struct
+{
+    int card_num;
+    int w[10];
+    int n[25];
+    int matches;
+    int instances;
+} Scratchcard;
+
+void day4()
+{
+    util_print_day(4);
+
+    char* input_file = "inputs/4.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    Scratchcard cards[256] = {0};
+    int num_cards = 0;
+
+    for(;;)
+    {
+        if(feof(fp))
+            break;
+
+        Scratchcard* c = &cards[num_cards++];
+
+        fscanf(fp,"Card %d: %d %d %d %d %d %d %d %d %d %d | %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+                &c->card_num,
+                &c->w[0],&c->w[1],&c->w[2],&c->w[3],&c->w[4],&c->w[5],&c->w[6],&c->w[7],&c->w[8],&c->w[9],
+                &c->n[0],&c->n[1],&c->n[2],&c->n[3],&c->n[4],&c->n[5],&c->n[6],&c->n[7],&c->n[8],&c->n[9],
+                &c->n[10],&c->n[11],&c->n[12],&c->n[13],&c->n[14],&c->n[15],&c->n[16],&c->n[17],&c->n[18],&c->n[19],
+                &c->n[20],&c->n[21],&c->n[22],&c->n[23],&c->n[24]);
+
+        /*
+        fscanf(fp,"Card %d: %d %d %d %d %d | %d %d %d %d %d %d %d %d\n",
+                &c->card_num,
+                &c->w[0],&c->w[1],&c->w[2],&c->w[3],&c->w[4],
+                &c->n[0],&c->n[1],&c->n[2],&c->n[3],&c->n[4],&c->n[5],&c->n[6],&c->n[7]
+          );
+          */
+    }
+
+    for(int i = 0; i < num_cards; ++i)
+    {
+        Scratchcard* c = &cards[i];
+
+        c->instances = 1;
+        
+        for(int j = 0; j < 10; ++j)
+        {
+            int w = c->w[j];
+            for(int k = 0; k < 25; ++k)
+            {
+                int n = c->n[k];
+                if(w == n)
+                    c->matches++;
+            }
+        }
+
+        //printf("Card %d: %ld\n", c->card_num, points);
+    }
+
+    long sum = 0;
+
+    for(int i = 0; i < num_cards; ++i)
+        sum += pow(2.0, cards[i].matches-1);
+
+    printf("1) Sum of points: %ld\n",sum);
+
+    // calculate instances
+    for(int i = 0; i < num_cards; ++i)
+    {
+        //printf("evaluating card %d\n",cards[i].card_num);
+
+        Scratchcard* c = &cards[i];
+        for(int j = 0; j < c->instances; ++j)
+        {
+            //printf("  instance %d (matches: %d)\n", j+1, c->matches);
+            for(int k = 1; k <= c->matches; ++k)
+            {
+                if(i+k < num_cards)
+                {
+                    cards[i+k].instances++;
+                    //printf("   Card %d instances: %d", i+k, cards[i+k].instances);
+                }
+            }
+        }
+
+        //util_wait_until_key_press();
+    }
+
+    long total_cards = 0;
+
+    for(int i = 0; i < num_cards; ++i)
+    {
+        total_cards += (cards[i].instances);
+    }
+
+    printf("2) Total cards: %ld\n", total_cards);
+
+    fclose(fp);
+}
+
 int main(int argc, char* args[])
 {
     printf("\n===================== AOC 2023 =======================\n");
@@ -603,6 +712,7 @@ int main(int argc, char* args[])
     day1();
     day2();
     day3();
+    day4();
 
     printf("\n======================================================\n");
     return 0;
