@@ -9,6 +9,9 @@ https://adventofcode.com/
 | 1 - Trebuchet?! | :star: | :star: |
 | 2 - Cube Conundrum | :star: | :star: |
 | 3 - Gear Ratios | :star: | :star: |
+| 4 - Scratchcards | :star: | :star: |
+| 5 - If you give a seed a fertilizer | :star: | :star: |
+| 6 - Wait for it | :star: | :star: |
 
 ## 2022
 
