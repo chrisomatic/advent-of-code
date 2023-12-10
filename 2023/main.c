@@ -705,6 +705,423 @@ void day4()
     fclose(fp);
 }
 
+typedef struct
+{
+    long n1;
+    long n2;
+    long n3;
+} SeedMapItem;
+
+
+void day5()
+{
+    util_print_day(5);
+
+    char* input_file = "inputs/5.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    long seed_nums[20] = {0};
+
+    fscanf(fp,"seeds: %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n",
+            &seed_nums[0], &seed_nums[1], &seed_nums[2], &seed_nums[3], &seed_nums[4],
+            &seed_nums[5], &seed_nums[6], &seed_nums[7], &seed_nums[8], &seed_nums[9],
+            &seed_nums[10], &seed_nums[11], &seed_nums[12], &seed_nums[13], &seed_nums[14],
+            &seed_nums[15], &seed_nums[16], &seed_nums[17], &seed_nums[18], &seed_nums[19]
+    );
+
+    char line[101] = {0};
+
+    SeedMapItem map_seed_to_soil[100]      = {0};
+    SeedMapItem map_soil_to_fert[100]      = {0};
+    SeedMapItem map_fert_to_water[100]     = {0};
+    SeedMapItem map_water_to_light[100]    = {0};
+    SeedMapItem map_light_to_temp[100]     = {0};
+    SeedMapItem map_temp_to_humid[100]     = {0};
+    SeedMapItem map_humid_to_location[100] = {0};
+
+    int count_seed_to_soil      = 0;
+    int count_soil_to_fert      = 0;
+    int count_fert_to_water     = 0;
+    int count_water_to_light    = 0;
+    int count_light_to_temp     = 0;
+    int count_temp_to_humid     = 0;
+    int count_humid_to_location = 0;
+
+    SeedMapItem* map = NULL;
+    int* count = NULL;
+
+    for(;;)
+    {
+        if(fgets(line,100,fp) == NULL)
+            break;
+
+        int line_len = strlen(line);
+        line[line_len-1] = 0; // remove newline
+
+        if(STR_EQUAL(line, "seed-to-soil map:"))
+        {
+            map = map_seed_to_soil;
+            count = &count_seed_to_soil;
+        }
+        else if(STR_EQUAL(line, "soil-to-fertilizer map:"))
+        {
+            map = map_soil_to_fert;
+            count = &count_soil_to_fert;
+        }
+        else if(STR_EQUAL(line, "fertilizer-to-water map:"))
+        {
+            map = map_fert_to_water;
+            count = &count_fert_to_water;
+        }
+        else if(STR_EQUAL(line, "water-to-light map:"))
+        {
+            map = map_water_to_light;
+            count = &count_water_to_light;
+        }
+        else if(STR_EQUAL(line, "light-to-temperature map:"))
+        {
+            map = map_light_to_temp;
+            count = &count_light_to_temp;
+        }
+        else if(STR_EQUAL(line, "temperature-to-humidity map:"))
+        {
+            map = map_temp_to_humid;
+            count = &count_temp_to_humid;
+        }
+        else if(STR_EQUAL(line, "humidity-to-location map:"))
+        {
+            map = map_humid_to_location;
+            count = &count_humid_to_location;
+        }
+        else
+        {
+            SeedMapItem* item = &map[*count];
+            int matches = sscanf(line, "%ld %ld %ld", &item->n1,&item->n2,&item->n3);
+            if(matches > 0)
+                (*count)++;
+        }
+    }
+
+    fclose(fp);
+
+    SeedMapItem* maps[] = {
+        map_seed_to_soil,
+        map_soil_to_fert,
+        map_fert_to_water,
+        map_water_to_light,
+        map_light_to_temp,
+        map_temp_to_humid,
+        map_humid_to_location
+    };
+
+    int counts[7] = {
+        count_seed_to_soil,
+        count_soil_to_fert,
+        count_fert_to_water,
+        count_water_to_light,
+        count_light_to_temp,
+        count_temp_to_humid,
+        count_humid_to_location
+    };
+
+    long min_location = LONG_MAX;
+
+    for(int l = 0; l < 20; ++l)
+    {
+        long num = seed_nums[l];
+
+        for(int i = 0; i < 7; ++i)
+        {
+            for(int j = 0; j < counts[i]; ++j)
+            {
+                long n1 = maps[i][j].n1;
+                long n2 = maps[i][j].n2;
+                long n3 = maps[i][j].n3;
+
+                if(num >= n2 && num < n2 + n3)
+                {
+                    // found range
+                    num = n1 + (num - n2);
+                    break;
+                }
+            }
+        }
+
+        if(num < min_location)
+            min_location = num;
+    }
+
+    printf("1) Lowest Location Number: %ld\n", min_location);
+
+    min_location = LONG_MAX;
+
+    for(int l = 0; l < 10; ++l)
+    {
+        // dumb brute-force solution
+        long fmax = seed_nums[2*l+1];
+        for(int f = 0; f < fmax; ++f)
+        {
+            //if(f % 1000000 == 0)
+            //    printf("%ld/%ld\n",f,fmax);
+
+            long num = seed_nums[2*l] + f;
+
+            for(int i = 0; i < 7; ++i)
+            {
+                for(int j = 0; j < counts[i]; ++j)
+                {
+                    long n1 = maps[i][j].n1;
+                    long n2 = maps[i][j].n2;
+                    long n3 = maps[i][j].n3;
+
+                    if(num >= n2 && num < n2 + n3)
+                    {
+                        // found range
+                        num = n1 + (num - n2);
+                        break;
+                    }
+                }
+            }
+
+            if(num < min_location)
+                min_location = num;
+        }
+        printf("min after set %d: %ld\n",l, min_location);
+    }
+
+    printf("2) Min Location in Ranges: %ld\n", min_location);
+}
+
+
+typedef struct
+{
+    int time;
+    int dist;
+} Race;
+
+void day6()
+{
+    util_print_day(6);
+
+    char* input_file = "inputs/6.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    const int num_races = 4;
+    Race races[4] = {0};
+
+    fscanf(fp, "Time: %d %d %d %d\n",
+            &races[0].time,
+            &races[1].time,
+            &races[2].time,
+            &races[3].time);
+
+    fscanf(fp, "Distance: %d %d %d %d\n",
+            &races[0].dist,
+            &races[1].dist,
+            &races[2].dist,
+            &races[3].dist);
+
+    fclose(fp);
+
+    int num_ways_to_win[4] = {0};
+
+    int margin_of_error = 1;
+
+    for(int i = 0; i < num_races; ++i)
+    {
+        int time_limit = races[i].time;
+
+        for(int t = 0; t < time_limit; ++t)
+        {
+            int dist = (time_limit - t)*t;
+
+            if(dist > races[i].dist)
+            {
+                num_ways_to_win[i]++;
+            }
+        }
+
+        margin_of_error *= num_ways_to_win[i];
+    }
+
+    printf("1) Margin of Error: %d\n", margin_of_error);
+
+    long time = 56717999;
+    long long dist = 334113513502430;
+
+    long ways_to_win = 0;
+    for(long t = 0; t < time; ++t)
+    {
+        long long d = (time - t)*t;
+        if(d > dist)
+            ways_to_win++;
+        
+    }
+
+    printf("2) Margin of Error: %ld\n", ways_to_win);
+
+}
+
+typedef enum
+{
+    HAND_TYPE_NONE = 0,
+    HAND_TYPE_HIGH_CARD,
+    HAND_TYPE_ONE_PAIR,
+    HAND_TYPE_TWO_PAIR,
+    HAND_TYPE_THREE_OF_A_KIND,
+    HAND_TYPE_FULL_HOUSE,
+    HAND_TYPE_FOUR_OF_A_KIND,
+    HAND_TYPE_FIVE_OF_A_KIND,
+} HandType;
+
+typedef struct
+{
+    char cards[5];
+    int bid;
+    HandType type;
+} CardHand;
+
+void day7_determine_hand_type(CardHand* hand)
+{
+    int max_matches = 0;
+    int matches[5] = {0};
+
+    for(int i = 0; i < 5; ++i)
+    {
+        int num_matches = 0;
+        int c1 = hand->cards[i];
+
+        for(int j = 0; j < 5; ++j)
+        {
+            int c2 = hand->cards[j];
+            if(c1 == c2)
+                num_matches++;
+        }
+        matches[i] = num_matches;
+        if(num_matches > max_matches)
+            max_matches = num_matches;
+    }
+
+    if(max_matches == 5)
+    {
+        hand->type = HAND_TYPE_FIVE_OF_A_KIND;
+        return;
+    }
+
+    if(max_matches == 4)
+    {
+        hand->type = HAND_TYPE_FOUR_OF_A_KIND;
+        return;
+    }
+
+    if(max_matches == 3)
+    {
+        // check for full house
+        for(int i = 0; i < 5; ++i)
+        {
+            if(matches[i] == 2)
+            {
+                hand->type = HAND_TYPE_FULL_HOUSE;
+                return;
+            }
+        }
+        hand->type = HAND_TYPE_THREE_OF_A_KIND;
+        return;
+    }
+
+    if(max_matches == 2)
+    {
+        // check pairs
+        int num_pairs = 0;
+        for(int i = 0; i < 5; ++i)
+        {
+            if(matches[i] == 2)
+                num_pairs++;
+        }
+
+        num_pairs /= 2;
+
+        if(num_pairs == 2)
+            hand->type = HAND_TYPE_TWO_PAIR;
+
+        hand->type = HAND_TYPE_ONE_PAIR;
+        return;
+    }
+
+    hand->type = HAND_TYPE_HIGH_CARD;
+
+}
+
+const char* hand_type_to_str(HandType type)
+{
+    switch(type)
+    {
+        case HAND_TYPE_NONE: return "None";
+        case HAND_TYPE_HIGH_CARD: return "High Card";
+        case HAND_TYPE_ONE_PAIR: return "One Pair";
+        case HAND_TYPE_TWO_PAIR: return "Two Pair";
+        case HAND_TYPE_THREE_OF_A_KIND: return "Three of a Kind";
+        case HAND_TYPE_FULL_HOUSE: return "Full House";
+        case HAND_TYPE_FOUR_OF_A_KIND: return "Four of a Kind";
+        case HAND_TYPE_FIVE_OF_A_KIND: return "Five of a Kind";
+    }
+    return "Unknown";
+}
+
+void day7()
+{
+    util_print_day(7);
+
+    char* input_file = "inputs/7.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    CardHand hands[1000] = {0};
+    int hand_count = 0;
+
+    for(;;)
+    {
+        if(feof(fp))
+            break;
+
+        CardHand* hand = &hands[hand_count];
+        int matches = fscanf(fp, "%s %d\n", hand->cards,&hand->bid);
+        if(matches)
+            hand_count++;
+    }
+
+    for(int i = 0; i < hand_count; ++i)
+    {
+        CardHand* hand = &hands[i];
+        day7_determine_hand_type(hand);
+    }
+
+    for(int i = 0; i < hand_count; ++i)
+    {
+        CardHand* hand = &hands[i];
+        printf("hand %d: %s %d, %s\n", i, hand->cards, hand->bid, hand_type_to_str(hand->type));
+    }
+
+    fclose(fp);
+}
+
 int main(int argc, char* args[])
 {
     printf("\n===================== AOC 2023 =======================\n");
@@ -713,6 +1130,9 @@ int main(int argc, char* args[])
     day2();
     day3();
     day4();
+    //day5();
+    day6();
+    day7();
 
     printf("\n======================================================\n");
     return 0;
