@@ -989,29 +989,69 @@ typedef enum
 typedef struct
 {
     char cards[5];
+    char cards_wild[5]; // with wildcards
     int bid;
     HandType type;
+    char best_card;
 } CardHand;
 
-void day7_determine_hand_type(CardHand* hand)
+void day7_determine_hand_type(CardHand* hand, bool jokers)
 {
     int max_matches = 0;
+    char max_char = 0;
+    char second_max_char = 0;
     int matches[5] = {0};
+    
+    char* cards = hand->cards;
+
+    if(jokers)
+    {
+        // create best hand
+        for(int i = 0; i < 5; ++i)
+        {
+            char c = hand->cards[i];
+            if(c == 'J' && hand->best_card)
+            {
+                hand->cards_wild[i] = hand->best_card;
+            }
+            else
+            {
+                hand->cards_wild[i] = hand->cards[i];
+            }
+        }
+
+        cards = hand->cards_wild;
+    }
 
     for(int i = 0; i < 5; ++i)
     {
         int num_matches = 0;
-        int c1 = hand->cards[i];
+        int c1 = cards[i];
 
         for(int j = 0; j < 5; ++j)
         {
-            int c2 = hand->cards[j];
+            int c2 = cards[j];
             if(c1 == c2)
                 num_matches++;
         }
         matches[i] = num_matches;
-        if(num_matches > max_matches)
+
+        if(num_matches >= max_matches)
+        {
             max_matches = num_matches;
+            max_char = c1;
+        }
+    }
+
+    for(int i = 0; i < 5; ++i)
+    {
+        if(cards[i] != max_char)
+            second_max_char = cards[i];
+    }
+
+    if(!jokers)
+    {
+        hand->best_card = max_char == 'J' ? second_max_char : max_char;
     }
 
     if(max_matches == 5)
@@ -1054,7 +1094,10 @@ void day7_determine_hand_type(CardHand* hand)
         num_pairs /= 2;
 
         if(num_pairs == 2)
+        {
             hand->type = HAND_TYPE_TWO_PAIR;
+            return;
+        }
 
         hand->type = HAND_TYPE_ONE_PAIR;
         return;
@@ -1078,6 +1121,67 @@ const char* hand_type_to_str(HandType type)
         case HAND_TYPE_FIVE_OF_A_KIND: return "Five of a Kind";
     }
     return "Unknown";
+}
+
+const char card_labels[] = {'2','3','4','5','6','7','8','9','T','J','Q','K','A'};
+const char card_labels_jokers[] = {'J','2','3','4','5','6','7','8','9','T','Q','K','A'};
+
+bool is_hand_greater(CardHand* hand, CardHand* key, bool jokers)
+{
+    if(hand->type > key->type)
+        return true;
+
+    if(hand->type < key->type)
+        return false;
+
+    // types are equal, evaluate cards
+
+    for(int i = 0; i < 5; ++i)
+    {
+        if(hand->cards[i] == key->cards[i])
+            continue;
+
+        int hand_label_position = 0;
+        int key_label_position = 0;
+
+        char* labels = jokers ? card_labels_jokers : card_labels;
+
+        for(int j = 0; j < 13; ++j)
+        {
+            if(hand->cards[i] == labels[j])
+                hand_label_position = j;
+
+            if(key->cards[i] == labels[j])
+                key_label_position = j;
+        }
+
+        if(hand_label_position > key_label_position)
+            return true;
+
+        return false;
+    }
+
+    return false;
+}
+
+void sort_cards(CardHand* hands, int count, bool jokers)
+{
+    // insertion sort
+    int i, j;
+    CardHand key;
+
+    for (i = 1; i < count; ++i) 
+    {
+        memcpy(&key, &hands[i], sizeof(CardHand));
+        j = i - 1;
+
+        while (j >= 0 && is_hand_greater(&hands[j], &key, jokers))
+        {
+            memcpy(&hands[j+1], &hands[j], sizeof(CardHand));
+            j = j - 1;
+        }
+        memcpy(&hands[j+1], &key, sizeof(CardHand));
+    }
 }
 
 void day7()
@@ -1107,19 +1211,55 @@ void day7()
             hand_count++;
     }
 
-    for(int i = 0; i < hand_count; ++i)
-    {
-        CardHand* hand = &hands[i];
-        day7_determine_hand_type(hand);
-    }
-
-    for(int i = 0; i < hand_count; ++i)
-    {
-        CardHand* hand = &hands[i];
-        printf("hand %d: %s %d, %s\n", i, hand->cards, hand->bid, hand_type_to_str(hand->type));
-    }
-
     fclose(fp);
+
+    for(int i = 0; i < hand_count; ++i)
+    {
+        CardHand* hand = &hands[i];
+        day7_determine_hand_type(hand, false);
+    }
+
+    sort_cards(hands, hand_count, false);
+
+    long total_winnings = 0;
+
+    for(int i = 0; i < hand_count; ++i)
+    {
+        CardHand* hand = &hands[i];
+        total_winnings += (i+1)*hand->bid;
+        //printf("rank %d: %s %d, %s, best card: %c\n", i+1, hand->cards, hand->bid, hand_type_to_str(hand->type), hand->best_card);
+    }
+
+    // 250835773: Too High
+    printf("1) Total Winnings: %ld\n",total_winnings);
+
+    for(int i = 0; i < hand_count; ++i)
+    {
+        CardHand* hand = &hands[i];
+        day7_determine_hand_type(hand, true);
+    }
+
+    sort_cards(hands, hand_count, true);
+
+    total_winnings = 0;
+    for(int i = 0; i < hand_count; ++i)
+    {
+        CardHand* hand = &hands[i];
+#if 0 
+        printf("rank %d: %c%c%c%c%c (%c%c%c%c%c) %d, %s, best card: %c\n", i+1,
+                hand->cards[0], hand->cards[1], hand->cards[2], hand->cards[3], hand->cards[4], 
+                hand->cards_wild[0], hand->cards_wild[1], hand->cards_wild[2], hand->cards_wild[3], hand->cards_wild[4], 
+                hand->bid, hand_type_to_str(hand->type), hand->best_card);
+#endif
+        total_winnings += (i+1)*hand->bid;
+    }
+
+    // 251932676: Too High
+    // 251145213: Too Low
+    // 252000000: Too High
+
+    printf("2) Total Winnings: %ld\n",total_winnings);
+
 }
 
 int main(int argc, char* args[])
