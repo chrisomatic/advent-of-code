@@ -1038,15 +1038,20 @@ void day7_determine_hand_type(CardHand* hand, bool jokers)
 
         if(num_matches >= max_matches)
         {
+            bool check = (num_matches == max_matches && c1 == 'J');
+            if(!check)
+                max_char = c1;
             max_matches = num_matches;
-            max_char = c1;
         }
     }
 
     for(int i = 0; i < 5; ++i)
     {
         if(cards[i] != max_char)
+        {
             second_max_char = cards[i];
+            break;
+        }
     }
 
     if(!jokers)
@@ -1123,8 +1128,8 @@ const char* hand_type_to_str(HandType type)
     return "Unknown";
 }
 
-const char card_labels[] = {'2','3','4','5','6','7','8','9','T','J','Q','K','A'};
-const char card_labels_jokers[] = {'J','2','3','4','5','6','7','8','9','T','Q','K','A'};
+char card_labels[] = {'2','3','4','5','6','7','8','9','T','J','Q','K','A'};
+char card_labels_jokers[] = {'J','2','3','4','5','6','7','8','9','T','Q','K','A'};
 
 bool is_hand_greater(CardHand* hand, CardHand* key, bool jokers)
 {
@@ -1245,21 +1250,383 @@ void day7()
     for(int i = 0; i < hand_count; ++i)
     {
         CardHand* hand = &hands[i];
-#if 0 
+#if 0
         printf("rank %d: %c%c%c%c%c (%c%c%c%c%c) %d, %s, best card: %c\n", i+1,
-                hand->cards[0], hand->cards[1], hand->cards[2], hand->cards[3], hand->cards[4], 
-                hand->cards_wild[0], hand->cards_wild[1], hand->cards_wild[2], hand->cards_wild[3], hand->cards_wild[4], 
-                hand->bid, hand_type_to_str(hand->type), hand->best_card);
+            hand->cards[0], hand->cards[1], hand->cards[2], hand->cards[3], hand->cards[4], 
+            hand->cards_wild[0], hand->cards_wild[1], hand->cards_wild[2], hand->cards_wild[3], hand->cards_wild[4], 
+            hand->bid, hand_type_to_str(hand->type), hand->best_card);
 #endif
         total_winnings += (i+1)*hand->bid;
     }
 
     // 251932676: Too High
     // 251145213: Too Low
-    // 252000000: Too High
+    // 251101560: Wrong
 
     printf("2) Total Winnings: %ld\n",total_winnings);
 
+}
+
+typedef struct NetworkNode NetworkNode;
+
+struct NetworkNode
+{
+    char name[4];
+    char left[4];
+    char right[4];
+
+    NetworkNode* left_ptr;
+    NetworkNode* right_ptr;
+};
+
+// Returns LCM of arr[0..n-1]
+unsigned long long int lcm(int arr[], int n)
+{
+    // Find the maximum value in arr[]
+    int max_num = 0;
+    for (int i=0; i<n; i++)
+        if (max_num < arr[i])
+            max_num = arr[i];
+ 
+    // Initialize result
+    unsigned long long int res = 1;
+ 
+    // Find all factors that are present in
+    // two or more array elements.
+    int x = 2;  // Current factor.
+    while (x <= max_num)
+    {
+        // To store indexes of all array
+        // elements that are divisible by x.
+        int indexes[10];
+        int index_count = 0;
+        for (int j=0; j<n; j++)
+            if (arr[j]%x == 0)
+                indexes[index_count++] = j;
+ 
+        // If there are 2 or more array elements
+        // that are divisible by x.
+        if (index_count >= 2)
+        {
+            // Reduce all array elements divisible
+            // by x.
+            for (int j=0; j<index_count; j++)
+                arr[indexes[j]] = arr[indexes[j]]/x;
+ 
+            res = res * x;
+        }
+        else
+            x++;
+    }
+ 
+    // Then multiply all reduced array elements
+    for (int i=0; i<n; i++)
+        res = res*arr[i];
+ 
+    return res;
+}
+
+void day8()
+{
+    util_print_day(8);
+
+    char* input_file = "inputs/8.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    char instructions[1000] = {0};
+    int instruction_count = 0;
+
+    // get instructions
+    for(;;)
+    {
+        int c = fgetc(fp);
+        if(c == '\n')
+            break;
+        instructions[instruction_count++] = c;
+    }
+
+    NetworkNode nodes[1000] = {0};
+    int node_count = 0;
+
+    // build network nodes
+
+    char line[100] = {0};
+
+    for(;;)
+    {
+        char name[3] = {0};
+        char left[3] = {0};
+        char right[3] = {0};
+
+        if(fgets(line, 99, fp) == NULL)
+            break;
+
+        int matches = sscanf(line,"%c%c%c = (%c%c%c, %c%c%c)\n",
+                &name[0],&name[1], &name[2],
+                &left[0],&left[1], &left[2],
+                &right[0],&right[1], &right[2]);
+
+        if(matches == 9)
+        {
+            NetworkNode* node = &nodes[node_count++];
+
+            memcpy(node->name,name,3*sizeof(char));
+            memcpy(node->left,left,3*sizeof(char));
+            memcpy(node->right,right,3*sizeof(char));
+        }
+    }
+
+    fclose(fp);
+
+#if 0
+    for(int i = 0; i < node_count; ++i)
+    {
+        printf("Node %d: %s (%s, %s)\n", i+1, 
+                nodes[i].name,
+                nodes[i].left,
+                nodes[i].right);
+    }
+#endif
+
+    // assign pointers
+    NetworkNode* start = 0;
+    NetworkNode* end   = 0;
+
+    for(int i = 0; i < node_count; ++i)
+    {
+        NetworkNode* node = &nodes[i];
+
+        if(node->name[0] == 'A' && node->name[1] == 'A' && node->name[2] == 'A')
+        {
+            start = node;
+        }
+        else if(node->name[0] == 'Z' && node->name[1] == 'Z' && node->name[2] == 'Z')
+        {
+            end = node;
+        }
+
+        for(int j = 0; j < node_count; ++j)
+        {
+            if(i == j) continue;
+
+            NetworkNode* check = &nodes[j];
+
+            if(node->left[0] == check->name[0] && node->left[1] == check->name[1] && node->left[2] == check->name[2])
+            {
+                node->left_ptr = check;
+            }
+
+            if(node->right[0] == check->name[0] && node->right[1] == check->name[1] && node->right[2] == check->name[2])
+            {
+                node->right_ptr = check;
+            }
+        }
+    }
+
+    // follow instructions
+    NetworkNode* node = start;
+
+    int steps = 0;
+
+    for(;;)
+    {
+        char c = instructions[steps % instruction_count];
+
+        if(c == 'L')
+        {
+            node = node->left_ptr;
+        }
+        else if(c == 'R')
+        {
+            node = node->right_ptr;
+        }
+
+        steps++;
+
+        if(node == end)
+            break;
+    }
+
+
+    printf("1) Required Steps: %d\n", steps);
+
+    NetworkNode* start_nodes[10] = {0};
+    NetworkNode* end_nodes[10] = {0};
+
+    int start_nodes_count = 0;
+    int end_nodes_count = 0;
+
+    for(int i = 0; i < node_count; ++i)
+    {
+        NetworkNode* node = &nodes[i];
+
+        if(node->name[2] == 'A')
+            start_nodes[start_nodes_count++] = node;
+        else if(node->name[2] == 'Z')
+            end_nodes[end_nodes_count++] = node;
+    }
+
+    NetworkNode* _nodes[10] = {0};
+    for(int i = 0; i < start_nodes_count; ++i)
+        _nodes[i] = start_nodes[i];
+
+    steps = 0;
+
+    int dist_to_z[10] = {0};
+
+    for(;;)
+    {
+        char c = instructions[steps % instruction_count];
+
+        if(c == 'L')
+        {
+            for(int i = 0; i < start_nodes_count; ++i)
+                _nodes[i] = _nodes[i]->left_ptr;
+        }
+        else if(c == 'R')
+        {
+            for(int i = 0; i < start_nodes_count; ++i)
+                _nodes[i] = _nodes[i]->right_ptr;
+        }
+
+        steps++;
+
+        for(int i = 0; i < start_nodes_count; ++i)
+        {
+            if(_nodes[i]->name[2] == 'Z')
+            {
+                if(dist_to_z[i] == 0)
+                {
+                    dist_to_z[i] = steps;
+                }
+
+                bool got_numbers = true;
+                for(int j = 0; j < start_nodes_count; ++j)
+                {
+                    if(dist_to_z[j] == 0)
+                    {
+                        got_numbers = false;
+                        break;
+                    }
+                }
+
+                if(got_numbers)
+                    goto day8_done;
+            }
+        }
+    }
+
+day8_done:
+
+    unsigned long long steps2 = lcm(dist_to_z, start_nodes_count);
+
+    // 5874751351312018839: too high
+    // 16342438708751
+    printf("2) Required Steps: %llu\n", steps2);
+
+}
+
+typedef struct
+{
+    int n[22];
+    int count;
+} HistoryLevel;
+
+void day9()
+{
+    util_print_day(9);
+
+    char* input_file = "inputs/9.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
+
+    HistoryLevel histories[100] = {0};
+
+    int level = 0;
+    long sum = 0;
+
+    for(;;)
+    {
+        if(feof(fp))
+            break;
+
+        memset(histories,0,100*sizeof(HistoryLevel));
+        level = 0;
+
+        int* n = histories[level].n;
+
+        // get input data
+        fscanf(fp, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+                &n[0],&n[1],&n[2],&n[3],&n[4],&n[5],&n[6],&n[7],&n[8],&n[9],
+                &n[10],&n[11],&n[12],&n[13],&n[14],&n[15],&n[16],&n[17],&n[18],&n[19],&n[20]);
+
+        histories[level].count = 21;
+
+        for(int i = 0; i < 21; ++i)
+        {
+            printf("%d ",histories[0].n[i]);
+        }
+        printf("\n");
+
+        // evaluate histories
+        for(;;)
+        {
+            level++;
+            int count = histories[level-1].count-1;
+            for(int i = 0; i < count; ++i)
+            {
+                int n1 = histories[level-1].n[i];
+                int n2 = histories[level-1].n[i+1];
+
+                histories[level].n[i] = n2-n1;
+                printf("%d ",n2-n1);
+            }
+
+            printf("\n");
+            histories[level].count = count;
+
+            bool all_zeroes = true;
+            for(int i = 0; i < histories[level].count; ++i)
+            {
+                if(histories[level].n[i] != 0)
+                {
+                    all_zeroes = false;
+                    break;
+                }
+            }
+
+            if(all_zeroes)
+                break;
+        }
+
+        for(int i = level; i >= 1; --i)
+        {
+            int count1 = histories[i-1].count;
+            int count2 = histories[i].count;
+
+            histories[i-1].n[count1] = histories[i].n[count2-1] + histories[i-1].n[count1-1];
+            histories[i-1].count++;
+        }
+
+        int next = histories[0].n[histories[0].count-1];
+        sum += next;
+        printf("Next in Sequence: %d\n",next);
+    }
+
+    printf("1) Sum of extrapolated values: %ld\n",sum);
+
+    fclose(fp);
 }
 
 int main(int argc, char* args[])
@@ -1273,6 +1640,8 @@ int main(int argc, char* args[])
     //day5();
     day6();
     day7();
+    day8();
+    day9();
 
     printf("\n======================================================\n");
     return 0;
