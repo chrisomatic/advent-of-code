@@ -1534,7 +1534,7 @@ day8_done:
 
 typedef struct
 {
-    int n[22];
+    int n[23];
     int count;
 } HistoryLevel;
 
@@ -1554,7 +1554,9 @@ void day9()
     HistoryLevel histories[100] = {0};
 
     int level = 0;
-    long sum = 0;
+
+    long sum1 = 0;
+    long sum2 = 0;
 
     for(;;)
     {
@@ -1568,36 +1570,37 @@ void day9()
 
         // get input data
         fscanf(fp, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
-                &n[0],&n[1],&n[2],&n[3],&n[4],&n[5],&n[6],&n[7],&n[8],&n[9],
-                &n[10],&n[11],&n[12],&n[13],&n[14],&n[15],&n[16],&n[17],&n[18],&n[19],&n[20]);
+                &n[1],&n[2],&n[3],&n[4],&n[5],&n[6],&n[7],&n[8],&n[9],&n[10],
+                &n[11],&n[12],&n[13],&n[14],&n[15],&n[16],&n[17],&n[18],&n[19],&n[20], &n[21]);
 
         histories[level].count = 21;
 
-        for(int i = 0; i < 21; ++i)
-        {
+#if 0
+        for(int i = 1; i < 22; ++i)
             printf("%d ",histories[0].n[i]);
-        }
+
         printf("\n");
+#endif
 
         // evaluate histories
         for(;;)
         {
             level++;
             int count = histories[level-1].count-1;
-            for(int i = 0; i < count; ++i)
+            for(int i = 1; i < count+1; ++i)
             {
                 int n1 = histories[level-1].n[i];
                 int n2 = histories[level-1].n[i+1];
 
                 histories[level].n[i] = n2-n1;
-                printf("%d ",n2-n1);
+                //printf("%d ",n2-n1);
             }
 
-            printf("\n");
+            //printf("\n");
             histories[level].count = count;
 
             bool all_zeroes = true;
-            for(int i = 0; i < histories[level].count; ++i)
+            for(int i = 1; i < histories[level].count+1; ++i)
             {
                 if(histories[level].n[i] != 0)
                 {
@@ -1615,16 +1618,42 @@ void day9()
             int count1 = histories[i-1].count;
             int count2 = histories[i].count;
 
-            histories[i-1].n[count1] = histories[i].n[count2-1] + histories[i-1].n[count1-1];
+            histories[i-1].n[count1+1] = histories[i].n[count2] + histories[i-1].n[count1];
+            histories[i-1].n[0] = histories[i-1].n[1] - histories[i].n[0];
+
             histories[i-1].count++;
         }
 
-        int next = histories[0].n[histories[0].count-1];
-        sum += next;
-        printf("Next in Sequence: %d\n",next);
+        int next = histories[0].n[histories[0].count];
+        int prev = histories[0].n[0];
+
+        sum1 += next;
+        sum2 += prev;
+
+        //printf("Next in Sequence: %d\n",next);
+        //printf("Prev in Sequence: %d\n",prev);
+
+        //util_wait_until_key_press();
     }
 
-    printf("1) Sum of extrapolated values: %ld\n",sum);
+    printf("1) Sum of extrapolated values: %ld\n",sum1);
+    printf("2) Sum of extrapolated values: %ld\n",sum2);
+
+    fclose(fp);
+}
+
+void day10()
+{
+    util_print_day(10);
+
+    char* input_file = "inputs/10.txt";
+    FILE* fp = fopen(input_file, "r");
+
+    if(!fp)
+    {
+        printf("Failed to open input file: %s\n",input_file);
+        return;
+    }
 
     fclose(fp);
 }
@@ -1642,6 +1671,7 @@ int main(int argc, char* args[])
     day7();
     day8();
     day9();
+    day10();
 
     printf("\n======================================================\n");
     return 0;

@@ -12,6 +12,9 @@ https://adventofcode.com/
 | 4 - Scratchcards | :star: | :star: |
 | 5 - If you give a seed a fertilizer | :star: | :star: |
 | 6 - Wait for it | :star: | :star: |
+| 7 - Camel Cards | :star: | :star: |
+| 8 - Haunted Wasteland | :star: | :star: |
+| 9 - Mirage Maintenance | :star: | :star: |
 
 ## 2022
 
