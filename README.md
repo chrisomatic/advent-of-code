@@ -15,6 +15,7 @@ https://adventofcode.com/
 | 7 - Camel Cards | :star: | :star: |
 | 8 - Haunted Wasteland | :star: | :star: |
 | 9 - Mirage Maintenance | :star: | :star: |
+| 10 - Pipe Maze | :star: |  |
 
 ## 2022
 

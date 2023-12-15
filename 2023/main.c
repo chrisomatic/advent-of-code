@@ -1642,6 +1642,29 @@ void day9()
     fclose(fp);
 }
 
+typedef enum
+{
+    DIR_NONE,
+    DIR_UP,
+    DIR_RIGHT,
+    DIR_DOWN,
+    DIR_LEFT,
+} Direction;
+
+typedef struct
+{
+    int x;
+    int y;
+} Point2D;
+
+typedef struct
+{
+    char c;
+    Direction dir;
+    int x;
+    int y;
+} Pipe;
+
 void day10()
 {
     util_print_day(10);
@@ -1655,7 +1678,131 @@ void day10()
         return;
     }
 
+    const int max_x = 140;
+    const int max_y = 140;
+
+    char pipe_maze[max_x][max_y];
+
+    int x = 0;
+    int y = 0;
+
+    int start_x = 0;
+    int start_y = 0;
+
+    for(;;)
+    {
+        int c = fgetc(fp);
+        
+        if(c == EOF)
+            break;
+
+        if(c == '\n')
+        {
+            x = 0;
+            y++;
+            continue;
+        }
+
+        if(c == 'S')
+        {
+            start_x = x;
+            start_y = y;
+        }
+
+        pipe_maze[x][y] = c;
+        x++;
+    }
+
     fclose(fp);
+
+    // find the loop
+    Pipe pipes[] = {
+        {pipe_maze[start_x][start_y-1], DIR_UP, start_x, start_y-1},    // up
+        {pipe_maze[start_x+1][start_y], DIR_RIGHT, start_x+1, start_y}, // right
+        {pipe_maze[start_x][start_y+1], DIR_DOWN, start_x, start_y+1},  // down
+        {pipe_maze[start_x-1][start_y], DIR_LEFT, start_x-1, start_y}   // left
+    };
+
+    Point2D loop_pipes[20000] = {0};
+    int loop_pipes_count = 0;
+
+
+    const char* dir_str[] = {"None", "Up", "Right", "Down", "Left"};
+
+    int i = 0;
+    int num_steps = 1;
+
+    loop_pipes[0].x = pipes[i].x;
+    loop_pipes[0].y = pipes[i].y;
+
+    loop_pipes_count = 1;
+
+    for(;;)
+    {
+        Pipe* p = &pipes[i];
+
+        //printf("Pipe %d: %c, %s, pos: (%d, %d)\n",i,p->c, dir_str[p->dir],p->x,p->y);
+
+        if(p->c == 'x') // this path went outside the grid
+            continue;
+
+        if(p->c == 'S')
+        {
+            //printf("Loop found! path: %d, num_steps: %d\n", i, num_steps);
+            // loop complete
+            break;
+        }
+
+        // set new direction
+        switch(p->c)
+        {
+            case '|': p->dir = p->dir == DIR_UP ?    DIR_UP :   DIR_DOWN; break;
+            case '-': p->dir = p->dir == DIR_LEFT ?  DIR_LEFT : DIR_RIGHT; break;
+            case 'L': p->dir = p->dir == DIR_LEFT ?  DIR_UP :   DIR_RIGHT; break;
+            case 'J': p->dir = p->dir == DIR_RIGHT ? DIR_UP :   DIR_LEFT; break;
+            case '7': p->dir = p->dir == DIR_RIGHT ? DIR_DOWN : DIR_LEFT; break;
+            case 'F': p->dir = p->dir == DIR_LEFT ?  DIR_DOWN : DIR_RIGHT; break;
+            case '.': p->dir = DIR_NONE; break;
+            default: break;
+        }
+
+        // set new character
+        switch(p->dir)
+        {
+            case DIR_UP:    p->y--; break;
+            case DIR_RIGHT: p->x++; break;
+            case DIR_DOWN:  p->y++; break;
+            case DIR_LEFT:  p->x--; break;
+            case DIR_NONE:  p->c = 'x'; break;
+        }
+
+        // bounds check
+        if(p->x < 0 || p->x >= max_x) 
+        {
+            p->c = 'x';
+            continue;
+        }
+
+        if(p->y < 0 || p->y >= max_y) 
+        {
+            p->c = 'x';
+            continue;
+        }
+
+        p->c = pipe_maze[p->x][p->y];
+
+        loop_pipes[loop_pipes_count].x = p->x;
+        loop_pipes[loop_pipes_count].y = p->y;
+        loop_pipes_count++;
+
+        //util_wait_until_key_press();
+
+        num_steps++;
+    }
+
+    // 6828: Too low
+    printf("1) Furthest distance: %d\n", num_steps/2);
+
 }
 
 int main(int argc, char* args[])
